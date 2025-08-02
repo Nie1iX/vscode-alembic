@@ -3,6 +3,7 @@ import { AlembicMigrationProvider } from './providers/migrationProvider';
 import { AlembicService } from './services/alembicService';
 import { MigrationGraphWebview } from './webviews/migrationGraph';
 import { ConfigurationManager } from './config/configurationManager';
+import { PythonDetector } from './utils/pythonDetector';
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('VS Code Alembic extension is now active!');
@@ -32,7 +33,8 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand('alembic.refreshMigrations', () => migrationProvider.refresh()),
 		vscode.commands.registerCommand('alembic.openSettings', () => ConfigurationManager.openSettings()),
 		vscode.commands.registerCommand('alembic.configureSettings', () => ConfigurationManager.showConfigurationQuickPick()),
-		vscode.commands.registerCommand('alembic.showVersion', () => alembicService.showVersion())
+		vscode.commands.registerCommand('alembic.showVersion', () => alembicService.showVersion()),
+		vscode.commands.registerCommand('alembic.selectPython', () => ConfigurationManager.selectPythonInterpreter())
 	];
 
 	// Register file system watcher
@@ -74,9 +76,18 @@ export function activate(context: vscode.ExtensionContext) {
 		migrationProvider.refresh();
 	}
 
-	// Validate configuration on startup
-	setTimeout(() => {
-		ConfigurationManager.validateConfiguration();
+	// Auto-detect Python interpreter if not configured
+	setTimeout(async () => {
+		await ConfigurationManager.validateConfiguration();
+
+		// If Python is still set to default, try to auto-detect
+		const currentConfig = ConfigurationManager.getConfiguration();
+		if (currentConfig.pythonPath === 'python') {
+			const detectedPython = await PythonDetector.autoDetectAndSetPython();
+			if (detectedPython) {
+				vscode.window.showInformationMessage(`Auto-detected Python interpreter: ${detectedPython}`);
+			}
+		}
 	}, 1000);
 }
 

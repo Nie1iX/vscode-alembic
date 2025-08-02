@@ -74,6 +74,12 @@
         "title": "Show Version",
         "category": "Alembic",
         "icon": "$(info)"
+      },
+      {
+        "command": "alembic.selectPython",
+        "title": "Select Python Interpreter",
+        "category": "Alembic",
+        "icon": "$(file-binary)"
       }
     ],
     "views": {

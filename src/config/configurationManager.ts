@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { PythonDetector } from '../utils/pythonDetector';
 
 export interface AlembicConfiguration {
 	pythonPath: string;
@@ -17,7 +18,7 @@ export class ConfigurationManager {
 	 */
 	static getConfiguration(): AlembicConfiguration {
 		const config = vscode.workspace.getConfiguration(this.SECTION);
-		
+
 		return {
 			pythonPath: config.get<string>('pythonPath', 'python'),
 			alembicPath: config.get<string>('alembicPath', 'alembic'),
@@ -34,8 +35,8 @@ export class ConfigurationManager {
 	 * @param target Configuration target (global, workspace, or workspaceFolder)
 	 */
 	static async updateConfiguration(
-		key: keyof AlembicConfiguration, 
-		value: any, 
+		key: keyof AlembicConfiguration,
+		value: any,
 		target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Workspace
 	): Promise<void> {
 		const config = vscode.workspace.getConfiguration(this.SECTION);
@@ -81,8 +82,12 @@ export class ConfigurationManager {
 		}
 
 		// Check if Python path is accessible
-		if (!config.pythonPath) {
-			issues.push('Python path is not configured');
+		if (!config.pythonPath || config.pythonPath === 'python') {
+			// Try to auto-detect Python interpreter
+			const detectedPython = await PythonDetector.autoDetectAndSetPython();
+			if (!detectedPython) {
+				issues.push('Python interpreter is not configured and could not be auto-detected');
+			}
 		}
 
 		// Check if config file exists in workspace
@@ -102,14 +107,17 @@ export class ConfigurationManager {
 			const message = `Alembic configuration issues found:\n${issues.join('\n')}`;
 			const action = await vscode.window.showWarningMessage(
 				message,
+				'Configure Python',
 				'Open Settings',
 				'Ignore'
 			);
-			
-			if (action === 'Open Settings') {
+
+			if (action === 'Configure Python') {
+				await this.selectPythonInterpreter();
+			} else if (action === 'Open Settings') {
 				await this.openSettings();
 			}
-			
+
 			return false;
 		}
 
@@ -121,7 +129,7 @@ export class ConfigurationManager {
 	 */
 	static async showConfigurationQuickPick(): Promise<void> {
 		const config = this.getConfiguration();
-		
+
 		const items: vscode.QuickPickItem[] = [
 			{
 				label: '$(gear) Open Settings',
@@ -168,7 +176,7 @@ export class ConfigurationManager {
 				await this.openSettings();
 				break;
 			case '$(file-binary) Python Path':
-				await this.configurePythonPath();
+				await this.selectPythonInterpreter();
 				break;
 			case '$(database) Alembic Path':
 				await this.configureAlembicPath();
@@ -185,16 +193,36 @@ export class ConfigurationManager {
 		}
 	}
 
-	private static async configurePythonPath(): Promise<void> {
-		const config = this.getConfiguration();
-		const newPath = await vscode.window.showInputBox({
-			prompt: 'Enter path to Python executable',
-			value: config.pythonPath,
-			placeHolder: 'python or /path/to/python'
-		});
+	/**
+	 * Shows Python interpreter picker and updates configuration
+	 */
+	static async selectPythonInterpreter(): Promise<void> {
+		const interpreter = await PythonDetector.showPythonInterpreterPicker();
+		if (interpreter) {
+			await this.updateConfiguration('pythonPath', interpreter.path);
+			vscode.window.showInformationMessage(`Python interpreter set to: ${interpreter.displayName}`);
+		}
+	}
 
-		if (newPath !== undefined) {
-			await this.updateConfiguration('pythonPath', newPath);
+	private static async configurePythonPath(): Promise<void> {
+		// First try to show the Python interpreter picker
+		const interpreter = await PythonDetector.showPythonInterpreterPicker();
+
+		if (interpreter) {
+			await this.updateConfiguration('pythonPath', interpreter.path);
+			vscode.window.showInformationMessage(`Python interpreter set to: ${interpreter.displayName}`);
+		} else {
+			// Fallback to manual input
+			const config = this.getConfiguration();
+			const newPath = await vscode.window.showInputBox({
+				prompt: 'Enter path to Python executable',
+				value: config.pythonPath,
+				placeHolder: 'python or /path/to/python'
+			});
+
+			if (newPath !== undefined) {
+				await this.updateConfiguration('pythonPath', newPath);
+			}
 		}
 	}
 

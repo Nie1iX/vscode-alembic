@@ -8,7 +8,8 @@ Visual Studio Code extension for managing Alembic database migrations with an in
 - 📊 **Migration Graph**: Visualize migration dependencies as an interactive graph (like git)
 - ⚡ **Quick Actions**: Create, upgrade, and downgrade migrations with one click
 - 🔧 **Configuration**: Customizable Alembic settings through VS Code preferences
-- 📝 **History View**: Browse migration history with detailed information
+- � **Python Auto-Detection**: Automatically detects Python interpreters in workspace and system
+- �📝 **History View**: Browse migration history with detailed information
 - 🔄 **Auto-refresh**: Automatically update when migration files change
 
 ## Installation
@@ -19,19 +20,24 @@ Visual Studio Code extension for managing Alembic database migrations with an in
 
 ## Quick Start
 
-1. **Initialize Alembic** (if not already done):
+1. **Python Setup** (automatic):
+   - The extension automatically detects Python interpreters in your workspace
+   - Supports virtual environments (venv, .venv, env), Conda environments, and system Python
+   - If needed, manually select with `Alembic: Select Python Interpreter`
+
+2. **Initialize Alembic** (if not already done):
    - Open Command Palette (`Ctrl+Shift+P`)
    - Run `Alembic: Initialize Alembic`
 
-2. **View Migrations**:
+3. **View Migrations**:
    - Check the "Alembic Migrations" view in the Explorer panel
    - Click the graph icon to see migration dependencies
 
-3. **Create Migration**:
+4. **Create Migration**:
    - Click the `+` icon in the migration view
    - Enter a descriptive message
 
-4. **Upgrade/Downgrade**:
+5. **Upgrade/Downgrade**:
    - Right-click on a migration in the tree view
    - Select upgrade or downgrade
 
@@ -46,6 +52,7 @@ Visual Studio Code extension for managing Alembic database migrations with an in
 | `Alembic: Downgrade Database` | Downgrade database to a specific revision |
 | `Alembic: Show Migration History` | Display migration history in output panel |
 | `Alembic: Show Version` | Display current Alembic version |
+| `Alembic: Select Python Interpreter` | Choose Python interpreter for Alembic operations |
 
 ## Available Templates
 
@@ -131,6 +138,28 @@ npm run compile
 ```bash
 npm test
 ```
+
+## Python Auto-Detection
+
+The extension automatically detects and configures Python interpreters with the following priority:
+
+1. **VS Code Python Extension**: Uses the currently selected interpreter from the Python extension
+2. **Workspace Virtual Environments**: Detects `venv`, `.venv`, `env` folders in your workspace
+3. **Conda Environments**: Lists available Conda environments
+4. **System Python**: Finds system-installed Python interpreters
+
+### Supported Virtual Environment Patterns
+
+- `./venv/` - Standard virtual environment
+- `./.venv/` - Hidden virtual environment (common in modern Python projects)
+- `./env/` - Alternative naming convention
+
+### Manual Configuration
+
+If auto-detection doesn't work or you need a specific interpreter:
+
+1. Use Command Palette: `Alembic: Select Python Interpreter`
+2. Or configure manually in VS Code settings: `alembic.pythonPath`
 
 ### Package Extension
 
