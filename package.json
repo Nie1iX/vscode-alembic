@@ -1,0 +1,188 @@
+{
+  "name": "vscode-alembic",
+  "displayName": "VS Code Alembic",
+  "description": "Visual Alembic database migration management with graph visualization",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.54.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:alembic.init",
+    "onCommand:alembic.showMigrationGraph",
+    "workspaceContains:**/alembic.ini"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "alembic.init",
+        "title": "Initialize Alembic",
+        "category": "Alembic"
+      },
+      {
+        "command": "alembic.showMigrationGraph",
+        "title": "Show Migration Graph",
+        "category": "Alembic",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "alembic.createMigration",
+        "title": "Create New Migration",
+        "category": "Alembic",
+        "icon": "$(add)"
+      },
+      {
+        "command": "alembic.upgrade",
+        "title": "Upgrade Database",
+        "category": "Alembic",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "alembic.downgrade",
+        "title": "Downgrade Database",
+        "category": "Alembic",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "alembic.history",
+        "title": "Show Migration History",
+        "category": "Alembic",
+        "icon": "$(history)"
+      },
+      {
+        "command": "alembic.refreshMigrations",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "alembic.openSettings",
+        "title": "Open Settings",
+        "category": "Alembic",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "alembic.configureSettings",
+        "title": "Configure Settings",
+        "category": "Alembic",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "alembic.showVersion",
+        "title": "Show Version",
+        "category": "Alembic",
+        "icon": "$(info)"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "alembicMigrations",
+          "name": "Alembic Migrations",
+          "when": "alembic:hasAlembicConfig"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "alembic.refreshMigrations",
+          "when": "view == alembicMigrations",
+          "group": "navigation"
+        },
+        {
+          "command": "alembic.createMigration",
+          "when": "view == alembicMigrations",
+          "group": "navigation"
+        },
+        {
+          "command": "alembic.showMigrationGraph",
+          "when": "view == alembicMigrations",
+          "group": "navigation"
+        },
+        {
+          "command": "alembic.configureSettings",
+          "when": "view == alembicMigrations",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "alembic.upgrade",
+          "when": "view == alembicMigrations && viewItem == migration",
+          "group": "inline"
+        },
+        {
+          "command": "alembic.downgrade",
+          "when": "view == alembicMigrations && viewItem == migration",
+          "group": "inline"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "alembic.refreshMigrations",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Alembic",
+      "properties": {
+        "alembic.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Path to Python executable"
+        },
+        "alembic.alembicPath": {
+          "type": "string",
+          "default": "alembic",
+          "description": "Path to Alembic executable"
+        },
+        "alembic.configFile": {
+          "type": "string",
+          "default": "alembic.ini",
+          "description": "Path to alembic.ini configuration file"
+        },
+        "alembic.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh migration list when files change"
+        },
+        "alembic.showFullHash": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show full migration hash instead of abbreviated"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.54.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "eslint": "^9.25.1",
+    "esbuild": "^0.25.3",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.8.3",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
