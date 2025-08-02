@@ -120,7 +120,7 @@ The migration graph provides a visual representation of your migration dependenc
 ### Building from Source
 
 ```bash
-git clone https://github.com/yourusername/vscode-alembic
+git clone https://github.com/Nie1iX/vscode-alembic
 cd vscode-alembic
 npm install
 npm run compile
@@ -152,9 +152,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- 🐛 [Report Issues](https://github.com/yourusername/vscode-alembic/issues)
-- 💡 [Request Features](https://github.com/yourusername/vscode-alembic/issues)
-- 📖 [Documentation](https://github.com/yourusername/vscode-alembic/wiki)
+- 🐛 [Report Issues](https://github.com/Nie1iX/vscode-alembic/issues)
+- 💡 [Request Features](https://github.com/Nie1iX/vscode-alembic/issues)
+- 📖 [Documentation](https://github.com/Nie1iX/vscode-alembic/wiki)
 
 ## Release Notes
 
