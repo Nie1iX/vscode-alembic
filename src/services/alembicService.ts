@@ -247,7 +247,7 @@ export class AlembicService {
 						const template = {
 							label: label.trim(),
 							description: label.trim() === 'generic' ?
-								`$(star) ${cleanDescription} (Recommended)` :
+								`${cleanDescription} (Recommended)` :
 								cleanDescription,
 							detail: this.getTemplateDetail(label.trim())
 						};
@@ -261,7 +261,7 @@ export class AlembicService {
 			if (templates.length > 0) {
 				this.outputChannel.appendLine(`Found ${templates.length} templates from Alembic:`);
 				templates.forEach(template => {
-					this.outputChannel.appendLine(`  - ${template.label}: ${template.description.replace('$(star) ', '').replace(' (Recommended)', '')}`);
+					this.outputChannel.appendLine(`  - ${template.label}: ${template.description.replace(' (Recommended)', '')}`);
 				});
 
 				// Sort to put 'generic' first (recommended default)
