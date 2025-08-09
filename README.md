@@ -21,19 +21,23 @@ Visual Studio Code extension for managing Alembic database migrations with an in
 ## Quick Start
 
 1. **Python Setup** (automatic):
+
    - The extension automatically detects Python interpreters in your workspace
    - Supports virtual environments (venv, .venv, env), Conda environments, and system Python
    - If needed, manually select with `Alembic: Select Python Interpreter`
 
 2. **Initialize Alembic** (if not already done):
+
    - Open Command Palette (`Ctrl+Shift+P`)
    - Run `Alembic: Initialize Alembic`
 
 3. **View Migrations**:
+
    - Check the "Alembic Migrations" view in the Explorer panel
    - Click the graph icon to see migration dependencies
 
 4. **Create Migration**:
+
    - Click the `+` icon in the migration view
    - Enter a descriptive message
 
@@ -43,15 +47,15 @@ Visual Studio Code extension for managing Alembic database migrations with an in
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `Alembic: Initialize Alembic` | Initialize Alembic in current workspace |
-| `Alembic: Show Migration Graph` | Open interactive migration dependency graph |
-| `Alembic: Create New Migration` | Create a new migration with autogenerate |
-| `Alembic: Upgrade Database` | Upgrade database to a specific revision |
-| `Alembic: Downgrade Database` | Downgrade database to a specific revision |
-| `Alembic: Show Migration History` | Display migration history in output panel |
-| `Alembic: Show Version` | Display current Alembic version |
+| Command                              | Description                                      |
+| ------------------------------------ | ------------------------------------------------ |
+| `Alembic: Initialize Alembic`        | Initialize Alembic in current workspace          |
+| `Alembic: Show Migration Graph`      | Open interactive migration dependency graph      |
+| `Alembic: Create New Migration`      | Create a new migration with autogenerate         |
+| `Alembic: Upgrade Database`          | Upgrade database to a specific revision          |
+| `Alembic: Downgrade Database`        | Downgrade database to a specific revision        |
+| `Alembic: Show Migration History`    | Display migration history in output panel        |
+| `Alembic: Show Version`              | Display current Alembic version                  |
 | `Alembic: Select Python Interpreter` | Choose Python interpreter for Alembic operations |
 
 ## Available Templates
@@ -60,13 +64,13 @@ When initializing Alembic, the extension automatically detects available templat
 
 **Common Templates** (availability depends on your Alembic version):
 
-| Template | Description (from Alembic) | When to Use |
-|----------|---------------------------|-------------|
-| **`generic`** | Generic single-database configuration | **Recommended for most projects** - standard setup |
-| `async` | Generic single-database configuration with an async dbapi | Async frameworks (FastAPI, aiohttp) with asyncpg/aiomysql |
-| `multidb` | Rudimentary multi-database configuration | Applications managing multiple databases |
-| `pyproject` | pyproject configuration, based on the generic configuration | Modern Python projects using pyproject.toml |
-| `pyproject_async` | pyproject configuration, with an async dbapi | Modern Python + async database operations |
+| Template          | Description (from Alembic)                                  | When to Use                                               |
+| ----------------- | ----------------------------------------------------------- | --------------------------------------------------------- |
+| **`generic`**     | Generic single-database configuration                       | **Recommended for most projects** - standard setup        |
+| `async`           | Generic single-database configuration with an async dbapi   | Async frameworks (FastAPI, aiohttp) with asyncpg/aiomysql |
+| `multidb`         | Rudimentary multi-database configuration                    | Applications managing multiple databases                  |
+| `pyproject`       | pyproject configuration, based on the generic configuration | Modern Python projects using pyproject.toml               |
+| `pyproject_async` | pyproject configuration, with an async dbapi                | Modern Python + async database operations                 |
 
 **Template Selection Features**:
 

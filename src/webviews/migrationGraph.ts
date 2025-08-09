@@ -1,69 +1,81 @@
-import * as vscode from 'vscode';
-import { AlembicService } from '../services/alembicService';
+import * as vscode from "vscode";
+import { AlembicService } from "../services/alembicService";
 
 export class MigrationGraphWebview {
-	private panel: vscode.WebviewPanel | undefined;
+  private panel: vscode.WebviewPanel | undefined;
 
-	constructor(
-		private context: vscode.ExtensionContext,
-		private alembicService: AlembicService
-	) {}
+  constructor(
+    private context: vscode.ExtensionContext,
+    private alembicService: AlembicService,
+  ) {}
 
-	public async show(): Promise<void> {
-		if (this.panel) {
-			this.panel.reveal();
-			return;
-		}
+  public async show(): Promise<void> {
+    if (this.panel) {
+      this.panel.reveal();
+      return;
+    }
 
-		this.panel = vscode.window.createWebviewPanel(
-			'migrationGraph',
-			'Migration Graph',
-			vscode.ViewColumn.One,
-			{
-				enableScripts: true,
-				retainContextWhenHidden: true
-			}
-		);
+    this.panel = vscode.window.createWebviewPanel(
+      "migrationGraph",
+      "Migration Graph",
+      vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+      },
+    );
 
-		this.panel.webview.html = await this.getWebviewContent();
+    this.panel.webview.html = await this.getWebviewContent();
 
-		// Handle messages from webview
-		this.panel.webview.onDidReceiveMessage(async (message) => {
-			switch (message.command) {
-				case 'ready':
-					await this.updateGraph();
-					break;
-				case 'refresh':
-					await this.updateGraph();
-					break;
-			}
-		});
+    // Handle messages from webview
+    this.panel.webview.onDidReceiveMessage(async (message) => {
+      switch (message.command) {
+        case "ready":
+          await this.updateGraph();
+          break;
+        case "refresh":
+          await this.updateGraph();
+          break;
+        case "upgrade":
+          await this.alembicService.upgrade(message.id);
+          await this.updateGraph();
+          break;
+        case "downgrade":
+          await this.alembicService.downgrade(message.id);
+          await this.updateGraph();
+          break;
+        case "merge":
+          await this.alembicService.mergeBranches(message.id);
+          await this.updateGraph();
+          break;
+      }
+    });
 
-		// Clean up when panel is closed
-		this.panel.onDidDispose(() => {
-			this.panel = undefined;
-		});
-	}
+    // Clean up when panel is closed
+    this.panel.onDidDispose(() => {
+      this.panel = undefined;
+    });
+  }
 
-	private async updateGraph(): Promise<void> {
-		if (!this.panel) {
-			return;
-		}
+  private async updateGraph(): Promise<void> {
+    if (!this.panel) {
+      return;
+    }
 
-		try {
-			const graphData = await this.alembicService.getMigrationGraph();
-			this.panel.webview.postMessage({
-				command: 'updateGraph',
-				data: graphData
-			});
-		} catch (error) {
-			console.error('Failed to update graph:', error);
-			vscode.window.showErrorMessage('Failed to load migration graph');
-		}
-	}
+    try {
+      const graphData = await this.alembicService.getMigrationGraph();
+      this.panel.webview.postMessage({
+        command: "updateGraph",
+        data: graphData,
+      });
+    } catch (error) {
+      console.error("Failed to update graph:", error);
+      vscode.window.showErrorMessage("Failed to load migration graph");
+    }
+  }
 
-	private async getWebviewContent(): Promise<string> {
-		return `
+  private async getWebviewContent(): Promise<string> {
+    return `
 		<!DOCTYPE html>
 		<html lang="en">
 		<head>
@@ -147,12 +159,15 @@ export class MigrationGraphWebview {
 			</style>
 		</head>
 		<body>
-			<div class="toolbar">
-				<button onclick="refreshGraph()">Refresh</button>
-				<button onclick="fitNetwork()">Fit to Screen</button>
-				<button onclick="togglePhysics()">Toggle Physics</button>
-				<span id="status">Loading...</span>
-			</div>
+            <div class="toolbar">
+                <button onclick="refreshGraph()">Refresh</button>
+                <button onclick="fitNetwork()">Fit to Screen</button>
+                <button onclick="togglePhysics()">Toggle Physics</button>
+                <button onclick="upgradeSelected()">Upgrade to selected</button>
+                <button onclick="downgradeSelected()">Downgrade to selected</button>
+                <button onclick="mergeSelected()">Merge from selected</button>
+                <span id="status">Loading...</span>
+            </div>
 
 			<div id="graph"></div>
 
@@ -231,11 +246,11 @@ export class MigrationGraphWebview {
 					const data = { nodes: [], edges: [] };
 					network = new vis.Network(container, data, options);
 
-					// Handle node selection
-					network.on('selectNode', function(params) {
-						const nodeId = params.nodes[0];
-						console.log('Selected node:', nodeId);
-					});
+                // Handle node selection & actions
+                network.on('selectNode', function(params) {
+                    const nodeId = params.nodes[0];
+                    window.currentNode = nodeId;
+                });
 				}
 
 				function updateGraph(graphData) {
@@ -262,10 +277,25 @@ export class MigrationGraphWebview {
 					document.getElementById('status').textContent = \`\${graphData.nodes.length} migrations\`;
 				}
 
-				function refreshGraph() {
+                function refreshGraph() {
 					document.getElementById('status').textContent = 'Refreshing...';
 					vscode.postMessage({ command: 'refresh' });
 				}
+                function upgradeSelected() {
+                  if (window.currentNode) {
+                    vscode.postMessage({ command: 'upgrade', id: window.currentNode });
+                  }
+                }
+                function downgradeSelected() {
+                  if (window.currentNode) {
+                    vscode.postMessage({ command: 'downgrade', id: window.currentNode });
+                  }
+                }
+                function mergeSelected() {
+                  if (window.currentNode) {
+                    vscode.postMessage({ command: 'merge', id: window.currentNode });
+                  }
+                }
 
 				function fitNetwork() {
 					if (network) {
@@ -297,5 +327,5 @@ export class MigrationGraphWebview {
 		</body>
 		</html>
 		`;
-	}
+  }
 }

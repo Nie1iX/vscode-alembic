@@ -1,0 +1,59 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Alembic INI",
+  "scopeName": "source.alembic-ini",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#sections" },
+    { "include": "#keyValue" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.ini",
+          "match": "^\\s*[#;].*$"
+        }
+      ]
+    },
+    "sections": {
+      "patterns": [
+        {
+          "name": "meta.section.ini",
+          "match": "^\\s*(\\[)([^\\]]+)(\\])\\s*$",
+          "captures": {
+            "1": { "name": "punctuation.definition.section.ini" },
+            "2": { "name": "entity.name.section.group-title.ini" },
+            "3": { "name": "punctuation.definition.section.ini" }
+          }
+        }
+      ]
+    },
+    "keyValue": {
+      "patterns": [
+        {
+          "begin": "^\\s*([A-Za-z0-9_.-]+)\\s*(=)\\s*",
+          "beginCaptures": {
+            "1": { "name": "support.type.property-name.ini" },
+            "2": { "name": "punctuation.separator.key-value.ini" }
+          },
+          "end": "$",
+          "name": "meta.mapping.key-value.ini",
+          "patterns": [
+            { "name": "constant.language.boolean.ini", "match": "(?i)\\b(true|false|on|off|yes|no)\\b" },
+            { "name": "constant.numeric.decimal.ini", "match": "[+-]?\\b\\d+(?:\\.\\d+)?\\b" },
+            { "name": "string.quoted.double.ini", "match": "\"[^\"]*\"" },
+            { "name": "string.quoted.single.ini", "match": "'[^']*'" },
+            { "name": "string.unquoted.uri.ini", "match": "[A-Za-z][A-Za-z0-9+.-]*://[^\\s#;]+" },
+            { "name": "constant.character.escape.alembic.template", "match": "%%\\([a-z]+\\)(?:\\.\\d+)?[a-z]" },
+            { "name": "constant.character.escape.alembic.template", "match": "%\\([a-z]+\\)(?:\\.\\d+)?[a-z]" },
+            { "name": "comment.line.number-sign.ini", "match": "[#;].*$" },
+            { "name": "string.unquoted.value.ini", "match": "[^#;]+" }
+          ]
+        }
+      ]
+    }
+  },
+  "fileTypes": ["ini"],
+  "uuid": "6f8c7e3e-9a9a-4b29-9b2f-b6a1f8e3b1ae"
+}

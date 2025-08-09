@@ -16,6 +16,30 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "alembic-ini",
+        "aliases": ["Alembic INI", "alembic-ini"],
+        "filenames": ["alembic.ini"],
+        "configuration": "./syntaxes/alembic-language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "alembic-ini",
+        "scopeName": "source.alembic-ini",
+        "path": "./syntaxes/alembic-ini.tmLanguage.json"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "alembic",
+          "title": "Alembic",
+          "icon": "resources/alembic.svg"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "alembic.init",
@@ -80,10 +104,28 @@
         "title": "Select Python Interpreter",
         "category": "Alembic",
         "icon": "$(file-binary)"
+      },
+      {
+        "command": "alembic.editAlembicIni",
+        "title": "Edit alembic.ini",
+        "category": "Alembic",
+        "icon": "$(settings)"
+      },
+      {
+        "command": "alembic.mergeBranches",
+        "title": "Merge Migration Branches",
+        "category": "Alembic",
+        "icon": "$(git-merge)"
+      },
+      {
+        "command": "alembic.inspectModels",
+        "title": "Inspect Alembic Model Visibility",
+        "category": "Alembic",
+        "icon": "$(list-unordered)"
       }
     ],
     "views": {
-      "explorer": [
+      "alembic": [
         {
           "id": "alembicMigrations",
           "name": "Alembic Migrations",
@@ -112,6 +154,21 @@
           "command": "alembic.configureSettings",
           "when": "view == alembicMigrations",
           "group": "navigation"
+        },
+        {
+          "command": "alembic.editAlembicIni",
+          "when": "view == alembicMigrations",
+          "group": "navigation"
+        },
+        {
+          "command": "alembic.mergeBranches",
+          "when": "view == alembicMigrations",
+          "group": "navigation"
+        },
+        {
+          "command": "alembic.inspectModels",
+          "when": "view == alembicMigrations",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
@@ -124,6 +181,21 @@
           "command": "alembic.downgrade",
           "when": "view == alembicMigrations && viewItem == migration",
           "group": "inline"
+        },
+        {
+          "command": "alembic.mergeBranches",
+          "when": "view == alembicMigrations && viewItem == migration",
+          "group": "inline"
+        },
+        {
+          "command": "alembic.upgrade",
+          "when": "view == alembicMigrations && viewItem == migration",
+          "group": "inline@2"
+        },
+        {
+          "command": "alembic.downgrade",
+          "when": "view == alembicMigrations && viewItem == migration",
+          "group": "inline@3"
         }
       ],
       "commandPalette": [
@@ -160,6 +232,18 @@
           "type": "boolean",
           "default": false,
           "description": "Show full migration hash instead of abbreviated"
+        },
+        "alembic.sequentialRevIdEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Experimental: generate sequential revision IDs (0001, 0002, ...) by passing --rev-id"
+        },
+        "alembic.sequentialRevIdWidth": {
+          "type": "number",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 32,
+          "description": "Zero-padded width for sequential revision IDs (used when sequentialRevIdEnabled=true)"
         }
       }
     }
@@ -176,6 +260,9 @@
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vscode-test"
   },
   "devDependencies": {
@@ -189,6 +276,14 @@
     "npm-run-all": "^4.1.5",
     "typescript": "^5.8.3",
     "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.9",
+    "prettier": "^3.3.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,md,css,scss,html,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }
