@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src __CSP_SOURCE__ data:; style-src 'unsafe-inline' __CSP_SOURCE__; script-src 'nonce-__NONCE__' __CSP_SOURCE__;">
+  <title>Alembic Models</title>
+  <style>
+  body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); }
+  .wrap { padding: 12px 16px; }
+  h2 { margin-top: 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { border: 1px solid var(--vscode-panel-border); background: var(--vscode-panel-background); border-radius: 4px; padding: 12px; }
+  ul { margin: 0; padding-left: 18px; }
+  .muted { color: var(--vscode-descriptionForeground); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>Alembic Model Visibility</h2>
+    __STATUS__
+    <div class="grid">
+      <div class="card">
+        <h3>Visible (__VISIBLE_COUNT__)</h3>
+        __VISIBLE_LIST__
+      </div>
+      <div class="card">
+        <h3>Hidden (__HIDDEN_COUNT__)</h3>
+        __HIDDEN_LIST__
+      </div>
+    </div>
+    __ERRORS_SECTION__
+  </div>
+  <script nonce="__NONCE__"></script>
+</body>
+</html>

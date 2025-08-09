@@ -21,7 +21,7 @@ export class ModelInspector {
     const cfgUri = vscode.Uri.joinPath(workspaceFolder, config.configFile);
 
     try {
-      const pyScript = this.buildInspectorPython();
+      const pyScript = await this.loadInspectorPython();
       const tmp = await this.writeTempScript(pyScript);
       try {
         const result = await this.execPython([tmp, "-c", config.configFile]);
@@ -85,93 +85,14 @@ export class ModelInspector {
     this.view.update(data);
   }
 
-  private buildInspectorPython(): string {
-    // A small python that loads alembic env and compares declared models vs target_metadata tables
-    return `
-import json, sys, importlib.util
-from pathlib import Path
-import os
-
-def load_env(config_path):
-    # Try to load env.py relative to config
-    cfg_dir = Path(config_path).resolve().parent
-    # search for 'alembic' dir containing env.py
-    candidates = [cfg_dir/'alembic'/'env.py', cfg_dir/'env.py']
-    for p in candidates:
-        if p.exists():
-            spec = importlib.util.spec_from_file_location('alembic_env', str(p))
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-            return mod
-    raise FileNotFoundError('env.py not found near alembic.ini')
-
-def get_target_metadata(mod):
-    # Common patterns: env.target_metadata or run_migrations_offline/online references
-    if hasattr(mod, 'target_metadata') and mod.target_metadata is not None:
-        return mod.target_metadata
-    # try to dig in globals
-    for k, v in vars(mod).items():
-        if k.endswith('metadata') and getattr(v, 'tables', None) is not None:
-            return v
-    return None
-
-def list_declared_models():
-    # best-effort: import SQLAlchemy and iterate over Base subclasses if present
-    try:
-        from sqlalchemy.orm import DeclarativeMeta
-        subclasses = set()
-        for cls in DeclarativeMeta.__subclasses__():
-            try:
-                if getattr(cls, '__tablename__', None):
-                    subclasses.add(cls)
-            except Exception:
-                pass
-        return sorted({f"{c.__module__}.{c.__name__}" for c in subclasses})
-    except Exception:
-        return []
-
-def main():
-    # params: script.py -c alembic.ini
-    cfg = None
-    args = sys.argv[1:]
-    for i in range(len(args)):
-        if args[i] == '-c' and i+1 < len(args):
-            cfg = args[i+1]
-            break
-    if not cfg:
-        print(json.dumps({'errors':['no -c config']}))
-        return
-    try:
-        env_mod = load_env(cfg)
-    except Exception as e:
-        print(json.dumps({'errors':[str(e)]}))
-        return
-    md = get_target_metadata(env_mod)
-    visible = []
-    if md is not None:
-        visible = sorted(list(md.tables.keys()))
-    declared = list_declared_models()
-    # hidden models: declared classes whose __tablename__ not in target md
-    hidden = []
-    for qual in declared:
-        try:
-            mod_name, cls_name = qual.rsplit('.', 1)
-            mod = __import__(mod_name, fromlist=[cls_name])
-            cls = getattr(mod, cls_name)
-            tn = getattr(cls, '__tablename__', None)
-            if tn and (md is None or tn not in md.tables):
-                hidden.append(f"{qual} (table: {tn})")
-        except Exception:
-            pass
-    print(json.dumps({'visible_models': visible, 'hidden_models': hidden, 'errors': []}))
-
-if __name__ == '__main__':
-    # allow VSCode to pass PYTHONPATH
-    ws = os.environ.get('VSCODE_WORKSPACE')
-    if ws and ws not in sys.path:
-        sys.path.insert(0, ws)
-    main()
-`;
+  private async loadInspectorPython(): Promise<string> {
+    const ctx = this.view?.extensionContext;
+    if (!ctx) {
+      throw new Error("No extension context for inspector script");
+    }
+    const uri = vscode.Uri.joinPath(ctx.extensionUri, "resources", "inspector.py");
+    const buf = await vscode.workspace.fs.readFile(uri);
+    return Buffer.from(buf).toString("utf8");
   }
 
   private async writeTempScript(content: string): Promise<string> {

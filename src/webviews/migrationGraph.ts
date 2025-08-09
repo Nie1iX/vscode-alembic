@@ -25,7 +25,7 @@ export class MigrationGraphWebview {
       },
     );
 
-    this.panel.webview.html = await this.getWebviewContent();
+    this.panel.webview.html = await this.getWebviewContentFromTemplate();
 
     // Handle messages from webview
     this.panel.webview.onDidReceiveMessage(async (message) => {
@@ -75,15 +75,27 @@ export class MigrationGraphWebview {
   }
 
   private async getWebviewContent(): Promise<string> {
+    const webview = this.panel!.webview;
+    const nonce = String(Date.now());
+    const localVis = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this.context.extensionUri,
+        "media",
+        "vis-network.min.js",
+      ),
+    );
+    // Inline HTML with strict CSP and local vis-network (fallback CDN kept commented if needed)
     return `
-		<!DOCTYPE html>
-		<html lang="en">
-		<head>
-			<meta charset="UTF-8">
-			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<title>Migration Graph</title>
-			<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-			<style>
+ 		<!DOCTYPE html>
+ 		<html lang="en">
+ 		<head>
+ 			<meta charset="UTF-8">
+ 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src 'unsafe-inline' ${webview.cspSource}; script-src 'nonce-${nonce}' ${webview.cspSource};">
+ 			<title>Migration Graph</title>
+ 			<script nonce="${nonce}" src="${localVis}"></script>
+ 			<!-- <script nonce="${nonce}" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script> -->
+ 			<style>
 				body {
 					font-family: var(--vscode-font-family);
 					color: var(--vscode-foreground);
@@ -327,5 +339,29 @@ export class MigrationGraphWebview {
 		</body>
 		</html>
 		`;
+  }
+
+  private async getWebviewContentFromTemplate(): Promise<string> {
+    const webview = this.panel!.webview;
+    const nonce = String(Date.now());
+    const templateUri = vscode.Uri.joinPath(
+      this.context.extensionUri,
+      "media",
+      "migrationGraph.html",
+    );
+    const visUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this.context.extensionUri,
+        "media",
+        "vis-network.min.js",
+      ),
+    );
+    const raw = await vscode.workspace.fs.readFile(templateUri);
+    let html = Buffer.from(raw).toString("utf8");
+    html = html
+      .replace(/__NONCE__/g, nonce)
+      .replace(/__VIS_JS__/g, String(visUri))
+      .replace(/__CSP_SOURCE__/g, webview.cspSource);
+    return html;
   }
 }

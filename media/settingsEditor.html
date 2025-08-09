@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' __CSP_SOURCE__; script-src 'nonce-__NONCE__' __CSP_SOURCE__;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alembic Settings</title>
+  <style>
+    body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; }
+    .container { padding: 12px 16px; }
+    .row { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+    .section { border: 1px solid var(--vscode-panel-border); background: var(--vscode-panel-background); padding: 12px; border-radius: 4px; margin-bottom: 12px; }
+    label { width: 220px; color: var(--vscode-descriptionForeground); }
+    input, select, textarea { width: 100%; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 6px 8px; border-radius: 3px; }
+    button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: 0; padding: 6px 10px; border-radius: 3px; cursor: pointer; }
+    button:hover { background: var(--vscode-button-hoverBackground); }
+    .actions { display: flex; gap: 10px; }
+    .help { font-size: 12px; color: var(--vscode-descriptionForeground); }
+    .grid { display: grid; grid-template-columns: 240px 1fr; gap: 10px; align-items: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="section">
+      <div class="row"><strong>alembic.ini editor</strong></div>
+      <div class="grid">
+        <label>File naming template</label>
+        <div>
+          <select id="fileTemplate">
+            <option value="%(rev)s_%(slug)s">default: %(rev)s_%(slug)s</option>
+            <option value="%(year)d_%(month).2d_%(day).2d_%(hour).2d%(minute).2d-%(rev)s_%(slug)s">date_rev_slug</option>
+            <option value="%(year)d_%(month).2d_%(day).2d_%(slug)s">date_slug</option>
+            <option value="%(rev)s-%(slug)s">rev-slug-dash</option>
+            <option value="%(rev)s">rev-only</option>
+          </select>
+          <div class="help">Задаёт шаблон имени файла (file_template). Не меняет сам revision id.</div>
+        </div>
+
+        <label>Sequential rev-id (experimental)</label>
+        <div>
+          <label style="width:auto; display:inline-flex; align-items:center; gap:8px;">
+            <input id="seqEnabled" type="checkbox" /> enable
+          </label>
+          <input id="seqWidth" style="max-width:100px; margin-left:8px;" type="number" min="1" max="32" value="4" />
+          <div class="help">При включении будет подставляться --rev-id (0001, 0002, ...). Иначе используется стандартный хэш Alembic.</div>
+        </div>
+
+        <label>script_location</label>
+        <input id="scriptLocation" type="text" placeholder="alembic" />
+
+        <label>version_locations</label>
+        <input id="versionLocations" type="text" placeholder="alembic/versions" />
+
+        <label>timezone</label>
+        <input id="timezone" type="text" placeholder="e.g. Europe/Berlin or leave blank" />
+
+        <label>truncate_slug_length</label>
+        <input id="truncateSlug" type="number" min="1" max="200" placeholder="40" />
+      </div>
+      <div class="actions" style="margin-top:10px;">
+        <button onclick="applyTemplate()">Apply template</button>
+        <button onclick="presetDefault()">Preset: default</button>
+        <button onclick="presetDateRevSlug()">Preset: date_rev_slug</button>
+        <button onclick="validatePaths()">Validate paths</button>
+        <button onclick="saveIni()">Save</button>
+      </div>
+      <div class="help">Конкретные ключи alembic.ini будут обновлены без удаления комментариев.</div>
+    </div>
+
+    <div class="section">
+      <div class="row"><strong>Raw alembic.ini</strong></div>
+      <textarea id="raw" rows="24" spellcheck="false"></textarea>
+      <div class="actions" style="margin-top:10px;"><button onclick="reloadIni()">Reload</button></div>
+    </div>
+  </div>
+
+  <script nonce="__NONCE__">
+    const vscode = acquireVsCodeApi();
+    const cfg = __INITIAL_CONFIG__;
+    window.addEventListener('message', (e) => {
+      const { command, payload } = e.data || {};
+      if (command === 'setIni') {
+        document.getElementById('raw').value = payload.content || '';
+        if (payload.parsed) {
+          const s = payload.parsed;
+          document.getElementById('fileTemplate').value = (s['alembic'] && s['alembic']['file_template']) || '%(rev)s_%(slug)s';
+          document.getElementById('seqEnabled').checked = localStorage.getItem('seqEnabled') === 'true';
+          document.getElementById('seqWidth').value = localStorage.getItem('seqWidth') || '4';
+          document.getElementById('scriptLocation').value = (s['alembic'] && (s['alembic']['script_location'] || s['alembic']['script_location '])) || 'alembic';
+          document.getElementById('versionLocations').value = (s['alembic'] && s['alembic']['version_locations']) || '';
+          document.getElementById('timezone').value = (s['alembic'] && s['alembic']['timezone']) || '';
+          document.getElementById('truncateSlug').value = (s['alembic'] && s['alembic']['truncate_slug_length']) || '';
+        }
+      }
+    });
+
+    function reloadIni() { vscode.postMessage({ command: 'load' }); }
+    function saveIni() {
+      vscode.postMessage({ command: 'save', payload: { content: document.getElementById('raw').value } });
+    }
+    function applyTemplate() {
+      const template = document.getElementById('fileTemplate').value;
+      const seqEnabled = document.getElementById('seqEnabled').checked;
+      const seqWidth = parseInt(document.getElementById('seqWidth').value || '4', 10);
+      localStorage.setItem('seqEnabled', String(seqEnabled));
+      localStorage.setItem('seqWidth', String(seqWidth));
+      const scriptLocation = document.getElementById('scriptLocation').value;
+      const versionLocations = document.getElementById('versionLocations').value;
+      const timezone = document.getElementById('timezone').value;
+      const truncateSlug = document.getElementById('truncateSlug').value;
+      vscode.postMessage({ command: 'applyRevisionStrategy', payload: { template, seqEnabled, seqWidth, scriptLocation, versionLocations, timezone, truncateSlug } });
+    }
+    function presetDefault() {
+      document.getElementById('fileTemplate').value = '%(rev)s_%(slug)s';
+      applyTemplate();
+    }
+    function presetDateRevSlug() {
+      document.getElementById('fileTemplate').value = '%(year)d_%(month).2d_%(day).2d_%(hour).2d%(minute).2d-%(rev)s_%(slug)s';
+      applyTemplate();
+    }
+    function validatePaths() {
+      const raw = document.getElementById('raw').value;
+      let scriptLoc = 'alembic';
+      let versionLoc = 'alembic/versions';
+      const m1 = raw.match(/^[ \t]*script_location\s*=\s*(.+)$/m);
+      if (m1) { scriptLoc = m1[1].trim(); }
+      const m2 = raw.match(/^[ \t]*version_locations\s*=\s*(.+)$/m);
+      if (m2) { versionLoc = m2[1].trim(); }
+      vscode.postMessage({ command: 'validatePaths', payload: { scriptLoc, versionLoc } });
+    }
+
+    // initial load
+    reloadIni();
+  </script>
+</body>
+</html>
