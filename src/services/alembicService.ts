@@ -210,48 +210,65 @@ export class AlembicService {
   }
 
   async getMigrations(): Promise<Migration[]> {
+    // Get history immediately - this is fast and doesn't require DB connection
     const historyResult = await this.executeCommand(
       this.buildCommand(["history"]),
     );
 
-    let currentResult = "";
-    try {
-      currentResult = await this.executeCommand(
-        this.buildCommand(["current"]),
-      );
-    } catch (error) {
-      // If current command fails (e.g., database not accessible),
-      // we can still show migrations from history
-      console.log('Failed to get current migration, showing history only:', error);
-      this.outputChannel.appendLine('Warning: Could not determine current migration (database not accessible)');
-    }
+    // Parse migrations from history (without current info)
+    const migrations = this.parseMigrations(historyResult, "");
 
-    const migrations = this.parseMigrations(historyResult, currentResult);
-
-    // Determine applied vs pending by walking ancestors from current revision
-    const current = migrations.find((m) => m.isCurrent)?.id;
-    if (current) {
-      const idToDown: Record<string, string | undefined> = {};
-      for (const m of migrations) {
-        idToDown[m.id] = m.downRevision;
-      }
-      const applied = new Set<string>();
-      let walker: string | undefined = current;
-      while (walker) {
-        applied.add(walker);
-        walker = idToDown[walker];
-      }
-      for (const m of migrations) {
-        m.isApplied = applied.has(m.id);
-      }
-    } else {
-      // No current -> can't determine status, mark all as unknown
-      for (const m of migrations) {
-        m.isApplied = false; // Default to pending since we can't determine
-      }
-    }
+    // Start getting current migration in background - don't wait for it
+    this.updateCurrentMigrationAsync(migrations);
 
     return migrations;
+  }
+
+  private async updateCurrentMigrationAsync(migrations: Migration[]): Promise<void> {
+    try {
+      const currentResult = await this.executeCommand(
+        this.buildCommand(["current"]),
+      );
+
+      const currentMigration = currentResult.trim();
+
+      // Update current migration info
+      for (const m of migrations) {
+        m.isCurrent = m.id === currentMigration;
+      }
+
+      // Determine applied vs pending by walking ancestors from current revision
+      const current = migrations.find((m) => m.isCurrent)?.id;
+      if (current) {
+        const idToDown: Record<string, string | undefined> = {};
+        for (const m of migrations) {
+          idToDown[m.id] = m.downRevision;
+        }
+        const applied = new Set<string>();
+        let walker: string | undefined = current;
+        while (walker) {
+          applied.add(walker);
+          walker = idToDown[walker];
+        }
+        for (const m of migrations) {
+          m.isApplied = applied.has(m.id);
+        }
+      }
+
+      // Refresh the tree view to show updated current migration
+      vscode.commands.executeCommand("alembic.refreshMigrations");
+
+    } catch (error) {
+      // If current command fails, just log it - migrations are already shown
+      console.log('Failed to get current migration (running in background):', error);
+      this.outputChannel.appendLine('Warning: Could not determine current migration (database not accessible)');
+
+      // Mark all as pending since we can't determine status
+      for (const m of migrations) {
+        m.isApplied = false;
+        m.isCurrent = false;
+      }
+    }
   }
 
   async getMigrationGraph(): Promise<{ nodes: any[]; edges: any[] }> {
