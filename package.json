@@ -233,17 +233,25 @@
           "default": false,
           "description": "Show full migration hash instead of abbreviated"
         },
-        "alembic.sequentialRevIdEnabled": {
-          "type": "boolean",
-          "default": false,
-          "description": "Experimental: generate sequential revision IDs (0001, 0002, ...) by passing --rev-id"
-        },
         "alembic.sequentialRevIdWidth": {
           "type": "number",
           "default": 4,
           "minimum": 1,
-          "maximum": 32,
-          "description": "Zero-padded width for sequential revision IDs (used when sequentialRevIdEnabled=true)"
+          "maximum": 8,
+          "description": "Zero-padded width for sequential revision IDs"
+        },
+        "alembic.revisionIdStrategy": {
+          "type": "string",
+          "enum": ["default", "hybrid"],
+          "default": "default",
+          "description": "Revision ID generation strategy: default (alembic hash) or hybrid (0001_1a2b3c4d)"
+        },
+        "alembic.hybridHashLength": {
+          "type": "number",
+          "default": 8,
+          "minimum": 4,
+          "maximum": 16,
+          "description": "Length of hash suffix for hybrid revision IDs (e.g., 8 for 0001_1a2b3c4d)"
         }
       }
     }

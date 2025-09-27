@@ -7,8 +7,9 @@ export interface AlembicConfiguration {
   configFile: string;
   autoRefresh: boolean;
   showFullHash: boolean;
-  sequentialRevIdEnabled?: boolean;
   sequentialRevIdWidth?: number;
+  revisionIdStrategy?: 'default' | 'hybrid';
+  hybridHashLength?: number;
 }
 
 export class ConfigurationManager {
@@ -27,11 +28,12 @@ export class ConfigurationManager {
       configFile: config.get<string>("configFile", "alembic.ini"),
       autoRefresh: config.get<boolean>("autoRefresh", true),
       showFullHash: config.get<boolean>("showFullHash", false),
-      sequentialRevIdEnabled: config.get<boolean>(
-        "sequentialRevIdEnabled",
-        false,
-      ),
       sequentialRevIdWidth: config.get<number>("sequentialRevIdWidth", 4),
+      revisionIdStrategy: config.get<'default' | 'hybrid'>(
+        "revisionIdStrategy",
+        "default",
+      ),
+      hybridHashLength: config.get<number>("hybridHashLength", 8),
     };
   }
 

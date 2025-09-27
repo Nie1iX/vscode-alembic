@@ -39,6 +39,9 @@ export class AlembicIniEditorWebview {
         case "validatePaths":
           await this.validatePaths(message.payload);
           break;
+        case "validateVersionLocations":
+          await this.validateVersionLocations(message.payload);
+          break;
       }
     });
 
@@ -111,12 +114,16 @@ export class AlembicIniEditorWebview {
 
   private async applyRevisionStrategy(payload: {
     template: string;
-    seqEnabled: boolean;
+    revIdStrategy?: string;
     seqWidth: number;
+    hashLength?: number;
     scriptLocation?: string;
     versionLocations?: string;
+    versionPathSeparator?: string;
+    recursiveVersionLocations?: boolean;
     timezone?: string;
     truncateSlug?: string;
+    sqlalchemyUrl?: string;
   }): Promise<void> {
     const cfg = ConfigurationManager.getConfiguration();
     const folders = vscode.workspace.workspaceFolders;
@@ -137,10 +144,25 @@ export class AlembicIniEditorWebview {
       };
       if (payload.timezone !== undefined) { base["timezone"] = payload.timezone; }
       if (payload.truncateSlug) { base["truncate_slug_length"] = payload.truncateSlug; }
+      if (payload.sqlalchemyUrl !== undefined && payload.sqlalchemyUrl.trim() !== "") {
+        base["sqlalchemy.url"] = payload.sqlalchemyUrl.trim();
+      }
+      // Only write version_path_separator if it's not the default 'os' value
+      if (payload.versionPathSeparator !== undefined && payload.versionPathSeparator !== "os") {
+        // Handle space separator specially - use 'space' as the value since actual space gets trimmed
+        const separatorValue = payload.versionPathSeparator === " " ? "space" : payload.versionPathSeparator;
+        base["version_path_separator"] = separatorValue;
+      }
+      if (payload.recursiveVersionLocations !== undefined) {
+        base["recursive_version_locations"] = payload.recursiveVersionLocations.toString();
+      }
       updated = updateIniSection(updated, "alembic", base);
-      // persist experimental sequential toggle to settings
-      await ConfigurationManager.updateConfiguration('sequentialRevIdEnabled', !!payload.seqEnabled);
+
+      // persist revision ID strategy to settings
+      const strategy = payload.revIdStrategy || 'default';
+      await ConfigurationManager.updateConfiguration('revisionIdStrategy', strategy);
       await ConfigurationManager.updateConfiguration('sequentialRevIdWidth', payload.seqWidth || 4);
+      await ConfigurationManager.updateConfiguration('hybridHashLength', payload.hashLength || 8);
       await vscode.workspace.fs.writeFile(uri, Buffer.from(updated, "utf8"));
       vscode.window.showInformationMessage(
         "Revision strategy applied to alembic.ini",
@@ -188,7 +210,87 @@ export class AlembicIniEditorWebview {
       scriptOk ? "OK" : "NOT FOUND"
     }; version_locations: ${payload.versionLoc} => ${
       versionOk ? "OK" : "NOT FOUND"
-    }`;
+    }    `;
     vscode.window.showInformationMessage(msg);
+  }
+
+  private async validateVersionLocations(payload: {
+    locations: string[];
+    separator: string;
+  }): Promise<void> {
+    if (!this.panel) {
+      return;
+    }
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+      vscode.window.showErrorMessage("Open a workspace to validate paths");
+      return;
+    }
+
+    const base = folders[0].uri;
+    const join = (p: string) =>
+      p && (p.startsWith("/") || p.match(/^[A-Za-z]:/))
+        ? vscode.Uri.file(p)
+        : vscode.Uri.joinPath(base, p);
+
+    const exists = async (u: vscode.Uri) => {
+      try {
+        await vscode.workspace.fs.stat(u);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const results: Array<{path: string; exists: boolean}> = [];
+    for (const location of payload.locations) {
+      if (location.trim()) {
+        const locationExists = await exists(join(location.trim()));
+        results.push({ path: location.trim(), exists: locationExists });
+      }
+    }
+
+    const missingPaths = results.filter(r => !r.exists);
+
+    if (missingPaths.length > 0) {
+      const createChoice = await vscode.window.showWarningMessage(
+        `Some version locations don't exist: ${missingPaths.map(r => r.path).join(', ')}`,
+        "Create missing directories",
+        "Cancel"
+      );
+
+      if (createChoice === "Create missing directories") {
+        await this.createMissingDirectories(missingPaths.map(r => r.path));
+      }
+    } else {
+      vscode.window.showInformationMessage(
+        `All version locations exist (${results.length} paths validated)`
+      );
+    }
+  }
+
+  private async createMissingDirectories(paths: string[]): Promise<void> {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+      return;
+    }
+
+    const base = folders[0].uri;
+    const join = (p: string) =>
+      p && (p.startsWith("/") || p.match(/^[A-Za-z]:/))
+        ? vscode.Uri.file(p)
+        : vscode.Uri.joinPath(base, p);
+
+    try {
+      for (const path of paths) {
+        const uri = join(path);
+        await vscode.workspace.fs.createDirectory(uri);
+      }
+      vscode.window.showInformationMessage(
+        `Created ${paths.length} directories: ${paths.join(', ')}`
+      );
+    } catch (e) {
+      vscode.window.showErrorMessage(`Failed to create directories: ${e}`);
+    }
   }
 }

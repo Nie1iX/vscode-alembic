@@ -17,6 +17,10 @@
     .actions { display: flex; gap: 10px; }
     .help { font-size: 12px; color: var(--vscode-descriptionForeground); }
     .grid { display: grid; grid-template-columns: 240px 1fr; gap: 10px; align-items: center; }
+    .location-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; margin: 2px 0; background: var(--vscode-editor-background); border-radius: 3px; }
+    .location-item span { flex: 1; font-family: monospace; }
+    .location-item button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: 0; padding: 2px 6px; border-radius: 2px; cursor: pointer; font-size: 11px; }
+    .location-item button:hover { background: var(--vscode-button-hoverBackground); }
   </style>
 </head>
 <body>
@@ -36,20 +40,65 @@
           <div class="help">Задаёт шаблон имени файла (file_template). Не меняет сам revision id.</div>
         </div>
 
-        <label>Sequential rev-id (experimental)</label>
+        <label>Revision ID strategy</label>
         <div>
-          <label style="width:auto; display:inline-flex; align-items:center; gap:8px;">
-            <input id="seqEnabled" type="checkbox" /> enable
-          </label>
-          <input id="seqWidth" style="max-width:100px; margin-left:8px;" type="number" min="1" max="32" value="4" />
-          <div class="help">При включении будет подставляться --rev-id (0001, 0002, ...). Иначе используется стандартный хэш Alembic.</div>
+          <select id="revIdStrategy" style="max-width:200px; margin-bottom:8px;">
+            <option value="default">Alembic default (hash)</option>
+            <option value="hybrid">Hybrid (0001_1a2b3c4d)</option>
+          </select>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+            <label style="width:auto;">Seq width:</label>
+            <input id="seqWidth" style="max-width:80px;" type="number" min="1" max="8" value="4" />
+            <label style="width:auto;">Hash length:</label>
+            <input id="hashLength" style="max-width:80px;" type="number" min="4" max="16" value="8" />
+          </div>
+          <div class="help">
+            Default: случайный хэш Alembic<br>
+            Hybrid: 0001_1a2b3c4d (номер + хэш для читаемости и уникальности)
+          </div>
+        </div>
+
+        <label>sqlalchemy.url</label>
+        <div>
+          <input id="sqlalchemyUrl" type="text" placeholder="postgresql://user:pass@localhost/db" />
+          <button onclick="validateUrl()" style="margin-left:8px; padding:4px 8px;">Validate</button>
+          <div class="help">Database connection URL. Password will be masked in display.</div>
         </div>
 
         <label>script_location</label>
         <input id="scriptLocation" type="text" placeholder="alembic" />
 
         <label>version_locations</label>
-        <input id="versionLocations" type="text" placeholder="alembic/versions" />
+        <div>
+          <div id="versionLocationsList" style="border: 1px solid var(--vscode-input-border); padding: 6px; border-radius: 3px; min-height: 40px; margin-bottom: 8px;">
+            <!-- version locations will be populated here -->
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input id="newVersionLocation" type="text" placeholder="Enter new location..." style="flex: 1;" />
+            <button onclick="addVersionLocation()" style="padding: 4px 8px;">Add</button>
+            <button onclick="validateVersionLocations()" style="padding: 4px 8px;">Validate</button>
+          </div>
+          <div class="help">Список директорий с файлами миграций. Можно указать несколько путей.</div>
+        </div>
+
+        <label>version_path_separator</label>
+        <div>
+          <select id="versionPathSeparator">
+            <option value="os">os.pathsep (auto)</option>
+            <option value=":">colon (:)</option>
+            <option value=";">semicolon (;)</option>
+            <option value=" ">space</option>
+          </select>
+          <div class="help">Разделитель для списка путей в version_locations. По умолчанию используется системный.</div>
+        </div>
+
+        <label>recursive_version_locations</label>
+        <div>
+          <label style="width:auto; display:inline-flex; align-items:center; gap:8px;">
+            <input id="recursiveVersionLocations" type="checkbox" /> enable recursive search
+          </label>
+          <div class="help">Рекурсивный поиск файлов ревизий в поддиректориях version_locations.</div>
+        </div>
 
         <label>timezone</label>
         <input id="timezone" type="text" placeholder="e.g. Europe/Berlin or leave blank" />
@@ -84,12 +133,28 @@
         if (payload.parsed) {
           const s = payload.parsed;
           document.getElementById('fileTemplate').value = (s['alembic'] && s['alembic']['file_template']) || '%(rev)s_%(slug)s';
-          document.getElementById('seqEnabled').checked = localStorage.getItem('seqEnabled') === 'true';
+
+          // Load revision ID strategy from localStorage
+          const savedStrategy = localStorage.getItem('revIdStrategy') || 'default';
+          document.getElementById('revIdStrategy').value = savedStrategy;
           document.getElementById('seqWidth').value = localStorage.getItem('seqWidth') || '4';
+          document.getElementById('hashLength').value = localStorage.getItem('hashLength') || '8';
           document.getElementById('scriptLocation').value = (s['alembic'] && (s['alembic']['script_location'] || s['alembic']['script_location '])) || 'alembic';
-          document.getElementById('versionLocations').value = (s['alembic'] && s['alembic']['version_locations']) || '';
+          // Handle version_locations as multi-value
+          const versionLocs = (s['alembic'] && s['alembic']['version_locations']) || 'alembic/versions';
+          setVersionLocations(versionLocs);
+
+          // Handle version_path_separator mapping: 'space' value -> ' ' option
+          const savedSeparator = (s['alembic'] && s['alembic']['version_path_separator']) || 'os';
+          const displaySeparator = savedSeparator === 'space' ? ' ' : savedSeparator;
+          document.getElementById('versionPathSeparator').value = displaySeparator;
+          document.getElementById('recursiveVersionLocations').checked = (s['alembic'] && s['alembic']['recursive_version_locations'] === 'true') || false;
+
           document.getElementById('timezone').value = (s['alembic'] && s['alembic']['timezone']) || '';
           document.getElementById('truncateSlug').value = (s['alembic'] && s['alembic']['truncate_slug_length']) || '';
+          const url = (s['alembic'] && s['alembic']['sqlalchemy.url']) || '';
+          document.getElementById('sqlalchemyUrl').value = url;
+          if (url) maskPasswordInDisplay();
         }
       }
     });
@@ -100,15 +165,39 @@
     }
     function applyTemplate() {
       const template = document.getElementById('fileTemplate').value;
-      const seqEnabled = document.getElementById('seqEnabled').checked;
+      const revIdStrategy = document.getElementById('revIdStrategy').value;
       const seqWidth = parseInt(document.getElementById('seqWidth').value || '4', 10);
-      localStorage.setItem('seqEnabled', String(seqEnabled));
+      const hashLength = parseInt(document.getElementById('hashLength').value || '8', 10);
+
+      // Save to localStorage
+      localStorage.setItem('revIdStrategy', revIdStrategy);
       localStorage.setItem('seqWidth', String(seqWidth));
+      localStorage.setItem('hashLength', String(hashLength));
+
       const scriptLocation = document.getElementById('scriptLocation').value;
-      const versionLocations = document.getElementById('versionLocations').value;
+      const versionLocations = getVersionLocations();
+      const versionPathSeparator = document.getElementById('versionPathSeparator').value;
+      const recursiveVersionLocations = document.getElementById('recursiveVersionLocations').checked;
       const timezone = document.getElementById('timezone').value;
       const truncateSlug = document.getElementById('truncateSlug').value;
-      vscode.postMessage({ command: 'applyRevisionStrategy', payload: { template, seqEnabled, seqWidth, scriptLocation, versionLocations, timezone, truncateSlug } });
+      const sqlalchemyUrl = document.getElementById('sqlalchemyUrl').value;
+
+      vscode.postMessage({
+        command: 'applyRevisionStrategy',
+        payload: {
+          template,
+          revIdStrategy,
+          seqWidth,
+          hashLength,
+          scriptLocation,
+          versionLocations,
+          versionPathSeparator,
+          recursiveVersionLocations,
+          timezone,
+          truncateSlug,
+          sqlalchemyUrl
+        }
+      });
     }
     function presetDefault() {
       document.getElementById('fileTemplate').value = '%(rev)s_%(slug)s';
@@ -127,6 +216,232 @@
       const m2 = raw.match(/^[ \t]*version_locations\s*=\s*(.+)$/m);
       if (m2) { versionLoc = m2[1].trim(); }
       vscode.postMessage({ command: 'validatePaths', payload: { scriptLoc, versionLoc } });
+    }
+
+    function validateUrl() {
+      const url = document.getElementById('sqlalchemyUrl').value.trim();
+      if (!url) {
+        alert('URL is empty');
+        return;
+      }
+
+      // Basic DSN validation
+      const dbUrlPattern = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/.+/;
+      if (!dbUrlPattern.test(url)) {
+        alert('Invalid database URL format. Expected: dialect://[user:password@]host[:port]/database');
+        return;
+      }
+
+      // Check for environment variables
+      if (url.includes('${') || url.includes('%') || url.includes('$(')) {
+        alert('URL appears to contain environment variables. This is OK.');
+        return;
+      }
+
+      alert('URL format appears valid');
+    }
+
+    let originalUrl = '';
+    function maskPasswordInDisplay() {
+      const input = document.getElementById('sqlalchemyUrl');
+      if (originalUrl === '') originalUrl = input.value;
+
+      const url = originalUrl;
+      const masked = url.replace(/:([^:@]+)@/, ':***@');
+      if (masked !== url) {
+        input.value = masked;
+        input.setAttribute('data-masked', 'true');
+      }
+    }
+
+    function unmaskPasswordForEdit() {
+      const input = document.getElementById('sqlalchemyUrl');
+      if (input.getAttribute('data-masked') === 'true' && originalUrl) {
+        input.value = originalUrl;
+        input.removeAttribute('data-masked');
+      }
+    }
+
+    // Version locations management
+    let versionLocationsData = [];
+
+    function setVersionLocations(locationsString) {
+      // Parse locations using different separators
+      const separator = document.getElementById('versionPathSeparator').value;
+      let sep = ':';
+      if (separator === 'os') {
+        sep = navigator.platform.includes('Win') ? ';' : ':';
+      } else if (separator === ' ' || separator === 'space') {
+        sep = ' ';
+      } else {
+        sep = separator;
+      }
+
+      // Handle edge case: if string contains mixed separators, try to detect the right one
+      let locations = [];
+      if (locationsString.includes(sep)) {
+        locations = locationsString.split(sep);
+      } else if (locationsString.includes(':') && sep !== ':') {
+        locations = locationsString.split(':');
+      } else if (locationsString.includes(';') && sep !== ';') {
+        locations = locationsString.split(';');
+      } else if (locationsString.includes(' ') && sep !== ' ') {
+        locations = locationsString.split(' ');
+      } else {
+        locations = [locationsString];
+      }
+
+      versionLocationsData = locations.map(s => s.trim()).filter(s => s.length > 0);
+      if (versionLocationsData.length === 0) {
+        versionLocationsData = ['alembic/versions'];
+      }
+      renderVersionLocations();
+    }
+
+    function getVersionLocations() {
+      const separator = document.getElementById('versionPathSeparator').value;
+      let sep = ':';
+      if (separator === 'os') {
+        sep = navigator.platform.includes('Win') ? ';' : ':';
+      } else if (separator === ' ' || separator === 'space') {
+        sep = ' ';
+      } else {
+        sep = separator;
+      }
+      return versionLocationsData.join(sep);
+    }
+
+    function renderVersionLocations() {
+      const container = document.getElementById('versionLocationsList');
+      container.innerHTML = '';
+
+      if (versionLocationsData.length === 0) {
+        container.innerHTML = '<div style="color: var(--vscode-descriptionForeground); font-style: italic;">No locations defined</div>';
+        return;
+      }
+
+      versionLocationsData.forEach((location, index) => {
+        const item = document.createElement('div');
+        item.className = 'location-item';
+        item.innerHTML = `
+          <span>${location}</span>
+          <button onclick="removeVersionLocation(${index})">Remove</button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function addVersionLocation() {
+      const input = document.getElementById('newVersionLocation');
+      const value = input.value.trim();
+
+      if (!value) {
+        alert('Please enter a location path');
+        return;
+      }
+
+      if (versionLocationsData.includes(value)) {
+        alert('This location is already in the list');
+        return;
+      }
+
+      // Basic path validation
+      if (value.includes('..')) {
+        if (!confirm('Path contains ".." which may cause issues. Continue anyway?')) {
+          return;
+        }
+      }
+
+      // Check for potentially problematic characters
+      const problematicChars = ['|', '<', '>', '"', '?', '*'];
+      const hasProblematic = problematicChars.some(char => value.includes(char));
+      if (hasProblematic) {
+        alert('Path contains invalid characters: ' + problematicChars.filter(char => value.includes(char)).join(', '));
+        return;
+      }
+
+      versionLocationsData.push(value);
+      input.value = '';
+      renderVersionLocations();
+    }
+
+    function removeVersionLocation(index) {
+      if (versionLocationsData.length > 1) {
+        versionLocationsData.splice(index, 1);
+        renderVersionLocations();
+      } else {
+        alert('At least one version location is required');
+      }
+    }
+
+    function validateVersionLocations() {
+      const separator = document.getElementById('versionPathSeparator').value;
+      vscode.postMessage({
+        command: 'validateVersionLocations',
+        payload: {
+          locations: versionLocationsData,
+          separator: separator
+        }
+      });
+    }
+
+    // Add event listeners for password masking
+    document.addEventListener('DOMContentLoaded', function() {
+      const urlInput = document.getElementById('sqlalchemyUrl');
+      urlInput.addEventListener('focus', unmaskPasswordForEdit);
+      urlInput.addEventListener('blur', function() {
+        originalUrl = this.value;
+        maskPasswordInDisplay();
+      });
+      urlInput.addEventListener('input', function() {
+        originalUrl = this.value;
+      });
+
+      // Add enter key support for adding version locations
+      const newLocationInput = document.getElementById('newVersionLocation');
+      newLocationInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          addVersionLocation();
+        }
+      });
+
+      // Update locations when separator changes
+      document.getElementById('versionPathSeparator').addEventListener('change', function() {
+        if (versionLocationsData.length > 0) {
+          renderVersionLocations();
+        }
+      });
+
+      // Handle revision ID strategy changes
+      document.getElementById('revIdStrategy').addEventListener('change', function() {
+        updateRevisionIdFields();
+      });
+
+      // Initial setup of revision ID fields
+      updateRevisionIdFields();
+    });
+
+    function updateRevisionIdFields() {
+      const strategy = document.getElementById('revIdStrategy').value;
+      const seqWidthContainer = document.getElementById('seqWidth').parentElement;
+      const hashLengthInput = document.getElementById('hashLength');
+      const hashLabel = hashLengthInput.previousElementSibling;
+
+      // Show/hide fields based on strategy
+      if (strategy === 'default') {
+        seqWidthContainer.style.display = 'none';
+      } else {
+        seqWidthContainer.style.display = 'flex';
+
+        // Show/hide hash length field for hybrid strategy
+        if (strategy === 'hybrid') {
+          hashLabel.style.display = 'inline';
+          hashLengthInput.style.display = 'inline';
+        } else {
+          hashLabel.style.display = 'none';
+          hashLengthInput.style.display = 'none';
+        }
+      }
     }
 
     // initial load

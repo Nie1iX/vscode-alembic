@@ -77,12 +77,14 @@ export class AlembicService {
     try {
       const args = ["revision", "--autogenerate", "-m", message];
       const cfg = ConfigurationManager.getConfiguration();
-      // Support custom revision id strategies via our [vscode-alembic] section in ini
-      if (cfg.sequentialRevIdEnabled) {
+
+      // Support custom revision id strategies
+      const strategy = cfg.revisionIdStrategy || 'default';
+      if (strategy === 'hybrid') {
         const width = cfg.sequentialRevIdWidth ?? 4;
-        // Implement sequential id by passing a custom env var consumed by our filename template hook
-        // If project does not have hook, fallback to --rev-id with next number computed from filesystem
-        const nextId = await this.computeNextSequentialId(width).catch(
+        const hashLength = cfg.hybridHashLength ?? 8;
+
+        const nextId = await this.computeRevisionId(strategy, width, hashLength).catch(
           () => undefined,
         );
         if (nextId) {
@@ -100,27 +102,43 @@ export class AlembicService {
     }
   }
 
-  private async computeNextSequentialId(width: number): Promise<string> {
+  private async computeRevisionId(
+    strategy: 'hybrid',
+    width: number,
+    hashLength: number
+  ): Promise<string> {
     const workspaceFolder = this.getWorkspaceFolder();
     if (!workspaceFolder) {
       throw new Error("No workspace");
     }
-    const cfg = ConfigurationManager.getConfiguration();
+
     const fs = require("fs");
     const path = require("path");
+    const crypto = require("crypto");
+
     // Try read version_locations or default folder
     const versionsDir = await this.resolveVersionsDir(workspaceFolder);
     const files = fs.existsSync(versionsDir) ? fs.readdirSync(versionsDir) : [];
     const numbers: number[] = [];
+
+    // Extract sequential numbers from existing hybrid files
     for (const f of files) {
-      const m = f.match(/^(\d{1,})_.+\.py$/);
+      const m = f.match(/^(\d{1,})(_.*)?\.py$/);
       if (m) {
         numbers.push(parseInt(m[1], 10));
       }
     }
+
     const next = (numbers.length ? Math.max(...numbers) : 0) + 1;
-    return next.toString().padStart(width, "0");
+    const seqPart = next.toString().padStart(width, "0");
+
+    // Generate random hash suffix for hybrid strategy
+    const hash = crypto.randomBytes(Math.ceil(hashLength / 2))
+      .toString('hex')
+      .substring(0, hashLength);
+    return `${seqPart}_${hash}`;
   }
+
 
   private async resolveVersionsDir(workspaceFolder: string): Promise<string> {
     const path = require("path");
