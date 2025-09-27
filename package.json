@@ -2,7 +2,7 @@
   "name": "vscode-alembic",
   "displayName": "VS Code Alembic",
   "description": "Visual Alembic database migration management with graph visualization",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "engines": {
     "vscode": "^1.54.0"
   },
