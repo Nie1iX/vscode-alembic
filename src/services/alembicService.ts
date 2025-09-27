@@ -636,6 +636,54 @@ export class AlembicService {
     return undefined;
   }
 
+  async openMigrationFile(migrationId: string): Promise<void> {
+    try {
+      // Find migration files in workspace
+      const workspaceFolder = this.getWorkspaceFolder();
+      if (!workspaceFolder) {
+        vscode.window.showErrorMessage("No workspace folder available");
+        return;
+      }
+
+      // Look for migration file with this ID
+      const migrationFiles = await vscode.workspace.findFiles(
+        "**/migrations/versions/*.py",
+        null,
+        100
+      );
+
+      // Find the file that contains this migration ID
+      let migrationFile: vscode.Uri | undefined;
+
+      for (const file of migrationFiles) {
+        try {
+          const content = await vscode.workspace.fs.readFile(file);
+          const contentStr = Buffer.from(content).toString("utf8");
+
+          // Check if this file contains the migration ID
+          if (contentStr.includes(`revision = '${migrationId}'`) ||
+              contentStr.includes(`revision = "${migrationId}"`)) {
+            migrationFile = file;
+            break;
+          }
+        } catch (error) {
+          // Skip files that can't be read
+          continue;
+        }
+      }
+
+      if (migrationFile) {
+        // Open the file in editor
+        const document = await vscode.workspace.openTextDocument(migrationFile);
+        await vscode.window.showTextDocument(document);
+      } else {
+        vscode.window.showWarningMessage(`Migration file for ${migrationId} not found`);
+      }
+    } catch (error) {
+      this.showError("Failed to open migration file", error);
+    }
+  }
+
   private showError(message: string, error: any): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
     vscode.window.showErrorMessage(`${message}: ${errorMessage}`);

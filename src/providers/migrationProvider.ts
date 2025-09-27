@@ -140,6 +140,13 @@ export class AlembicMigrationProvider
     // Set tooltip
     item.tooltip = `${migration.id}\n${migration.message}\nStatus: ${status}`;
 
+    // Add command to open migration file on click
+    item.command = {
+      command: "alembic.openMigrationFile",
+      title: "Open Migration File",
+      arguments: [migration.id]
+    };
+
     return item;
   }
 }

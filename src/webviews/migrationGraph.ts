@@ -48,6 +48,9 @@ export class MigrationGraphWebview {
           await this.alembicService.mergeBranches(message.id);
           await this.updateGraph();
           break;
+        case "openFile":
+          await this.alembicService.openMigrationFile(message.id);
+          break;
       }
     });
 
@@ -264,6 +267,14 @@ export class MigrationGraphWebview {
                 network.on('selectNode', function(params) {
                     const nodeId = params.nodes[0];
                     window.currentNode = nodeId;
+                });
+
+                // Handle double click to open migration file
+                network.on('doubleClick', function(params) {
+                    if (params.nodes.length > 0) {
+                        const nodeId = params.nodes[0];
+                        vscode.postMessage({ command: 'openFile', id: nodeId });
+                    }
                 });
 				}
 

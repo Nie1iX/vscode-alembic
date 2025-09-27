@@ -110,12 +110,16 @@ export class ConfigurationManager {
 
     // Check if Python path is accessible
     if (!config.pythonPath || config.pythonPath === "python") {
-      // Try to auto-detect Python interpreter
-      const detectedPython = await PythonDetector.autoDetectAndSetPython();
-      if (!detectedPython) {
-        issues.push(
-          "Python interpreter is not configured and could not be auto-detected",
-        );
+      // Check if there's a configured Python path available
+      const configuredPath = (await import("../utils/pythonDetector")).PythonDetector.getConfiguredPythonPath();
+      if (!configuredPath) {
+        // Only try auto-detection if no configured path exists
+        const detectedPython = await PythonDetector.autoDetectAndSetPython();
+        if (!detectedPython) {
+          issues.push(
+            "Python interpreter is not configured. Please set python.defaultInterpreterPath or alembic.pythonPath",
+          );
+        }
       }
     }
 

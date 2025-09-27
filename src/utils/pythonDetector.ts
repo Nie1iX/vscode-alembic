@@ -241,9 +241,36 @@ export class PythonDetector {
   }
 
   /**
+   * Gets configured Python path without prompting user
+   */
+  static getConfiguredPythonPath(): string | undefined {
+    // Check alembic.pythonPath first
+    const alembicConfig = vscode.workspace.getConfiguration("alembic");
+    const alembicPythonPath = alembicConfig.get<string>("pythonPath");
+    if (alembicPythonPath && alembicPythonPath !== "python") {
+      return alembicPythonPath;
+    }
+
+    // Check python.defaultInterpreterPath
+    const pythonConfig = vscode.workspace.getConfiguration("python");
+    const defaultInterpreterPath = pythonConfig.get<string>("defaultInterpreterPath");
+    if (defaultInterpreterPath && defaultInterpreterPath !== "python") {
+      return defaultInterpreterPath;
+    }
+
+    return undefined;
+  }
+
+  /**
    * Automatically detects and sets the best Python interpreter
    */
   static async autoDetectAndSetPython(): Promise<string | undefined> {
+    // First check if we already have a configured path
+    const configuredPath = this.getConfiguredPythonPath();
+    if (configuredPath) {
+      return configuredPath;
+    }
+
     const interpreters = await this.detectPythonInterpreters();
 
     if (interpreters.length === 0) {

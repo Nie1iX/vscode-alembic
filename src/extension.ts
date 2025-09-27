@@ -78,6 +78,9 @@ export function activate(context: vscode.ExtensionContext) {
       modelsView.show();
       await modelInspector.inspectAndReport();
     }),
+    vscode.commands.registerCommand("alembic.openMigrationFile", (migrationId: string) =>
+      alembicService.openMigrationFile(migrationId),
+    ),
   ];
 
   // Register file system watcher
@@ -127,15 +130,26 @@ export function activate(context: vscode.ExtensionContext) {
   setTimeout(async () => {
     await ConfigurationManager.validateConfiguration();
 
-    // If Python is still set to default, try to auto-detect
+    // Check if we have any configured Python path
+    const configuredPath = PythonDetector.getConfiguredPythonPath();
     const currentConfig = ConfigurationManager.getConfiguration();
-    if (currentConfig.pythonPath === "python") {
+
+    // Only auto-detect if no valid Python path is configured
+    if (currentConfig.pythonPath === "python" && !configuredPath) {
       const detectedPython = await PythonDetector.autoDetectAndSetPython();
       if (detectedPython) {
         vscode.window.showInformationMessage(
           `Auto-detected Python interpreter: ${detectedPython}`,
         );
       }
+    } else if (configuredPath && currentConfig.pythonPath === "python") {
+      // Use the configured path from python.defaultInterpreterPath
+      const config = vscode.workspace.getConfiguration("alembic");
+      await config.update(
+        "pythonPath",
+        configuredPath,
+        vscode.ConfigurationTarget.Workspace,
+      );
     }
   }, 1000);
 }
