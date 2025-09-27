@@ -85,7 +85,6 @@
   <div class="toolbar">
     <button onclick="refreshGraph()">Refresh</button>
     <button onclick="fitNetwork()">Fit to Screen</button>
-    <button onclick="togglePhysics()">Toggle Physics</button>
     <button onclick="upgradeSelected()">Upgrade to selected</button>
     <button onclick="downgradeSelected()">Downgrade to selected</button>
     <button onclick="mergeSelected()">Merge from selected</button>
@@ -112,7 +111,6 @@
   <script nonce="__NONCE__">
     const vscode = acquireVsCodeApi();
     let network = null;
-    let physicsEnabled = true;
 
     // Network options
     const options = {
@@ -121,18 +119,12 @@
           direction: 'DU',
           sortMethod: 'directed',
           nodeSpacing: 100,
-          levelSeparation: 150
+          levelSeparation: 150,
+          shakeTowards: 'leaves'  // Стабилизирует позиции
         }
       },
       physics: {
-        enabled: true,
-        hierarchicalRepulsion: {
-          nodeDistance: 120,
-          centralGravity: 0.0,
-          springLength: 100,
-          springConstant: 0.01,
-          damping: 0.09
-        }
+        enabled: false  // Отключили физику для производительности
       },
       nodes: {
         shape: 'box',
@@ -142,7 +134,7 @@
           size: 14
         },
         borderWidth: 2,
-        shadow: true
+        shadow: false  // Убрали тени для более плоского вида как в git log
       },
       edges: {
         color: 'var(--vscode-foreground)',
@@ -153,12 +145,10 @@
             scaleFactor: 1
           }
         },
-        smooth: {
-          type: 'dynamic'
-        }
+        smooth: false  // Прямые линии как в git log
       },
       interaction: {
-        dragNodes: true,
+        dragNodes: false,  // Убрали перетаскивание узлов
         dragView: true,
         zoomView: true
       }
@@ -223,13 +213,6 @@
     function fitNetwork() {
       if (network) {
         network.fit();
-      }
-    }
-
-    function togglePhysics() {
-      if (network) {
-        physicsEnabled = !physicsEnabled;
-        network.setOptions({ physics: { enabled: physicsEnabled } });
       }
     }
 
