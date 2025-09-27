@@ -210,74 +210,64 @@ export class AlembicService {
   }
 
   async getMigrations(): Promise<Migration[]> {
-    try {
-      const historyResult = await this.executeCommand(
-        this.buildCommand(["history"]),
-      );
-      const currentResult = await this.executeCommand(
-        this.buildCommand(["current"]),
-      );
+    const historyResult = await this.executeCommand(
+      this.buildCommand(["history"]),
+    );
+    const currentResult = await this.executeCommand(
+      this.buildCommand(["current"]),
+    );
 
-      const migrations = this.parseMigrations(historyResult, currentResult);
+    const migrations = this.parseMigrations(historyResult, currentResult);
 
-      // Determine applied vs pending by walking ancestors from current revision
-      const current = migrations.find((m) => m.isCurrent)?.id;
-      if (current) {
-        const idToDown: Record<string, string | undefined> = {};
-        for (const m of migrations) {
-          idToDown[m.id] = m.downRevision;
-        }
-        const applied = new Set<string>();
-        let walker: string | undefined = current;
-        while (walker) {
-          applied.add(walker);
-          walker = idToDown[walker];
-        }
-        for (const m of migrations) {
-          m.isApplied = applied.has(m.id);
-        }
-      } else {
-        // No current -> nothing applied
-        for (const m of migrations) {
-          m.isApplied = false;
-        }
+    // Determine applied vs pending by walking ancestors from current revision
+    const current = migrations.find((m) => m.isCurrent)?.id;
+    if (current) {
+      const idToDown: Record<string, string | undefined> = {};
+      for (const m of migrations) {
+        idToDown[m.id] = m.downRevision;
       }
-
-      return migrations;
-    } catch (error) {
-      console.error("Failed to get migrations:", error);
-      return [];
+      const applied = new Set<string>();
+      let walker: string | undefined = current;
+      while (walker) {
+        applied.add(walker);
+        walker = idToDown[walker];
+      }
+      for (const m of migrations) {
+        m.isApplied = applied.has(m.id);
+      }
+    } else {
+      // No current -> nothing applied
+      for (const m of migrations) {
+        m.isApplied = false;
+      }
     }
+
+    return migrations;
   }
 
   async getMigrationGraph(): Promise<{ nodes: any[]; edges: any[] }> {
-    try {
-      const migrations = await this.getMigrations();
-      const nodes = migrations.map((migration) => ({
-        id: migration.id,
-        label: migration.shortId,
-        title: migration.message,
-        color: migration.isCurrent
-          ? "#4CAF50"
-          : migration.isApplied
-            ? "#2196F3"
-            : "#FFC107",
-        font: { color: "white" },
+    const migrations = await this.getMigrations();
+    const nodes = migrations.map((migration) => ({
+      id: migration.id,
+      label: migration.shortId,
+      title: migration.message,
+      color: migration.isCurrent
+        ? "#4CAF50"
+        : migration.isApplied
+          ? "#2196F3"
+          : "#FFC107",
+      font: { color: "white" },
+    }));
+
+    const edges = migrations
+      .filter((m) => m.downRevision)
+      .map((m) => ({
+        from: m.downRevision,
+        to: m.id,
+        arrows: "to",
       }));
 
-      const edges = migrations
-        .filter((m) => m.downRevision)
-        .map((m) => ({
-          from: m.downRevision,
-          to: m.id,
-          arrows: "to",
-        }));
-
-      return { nodes, edges };
-    } catch (error) {
-      console.error("Failed to get migration graph:", error);
-      return { nodes: [], edges: [] };
-    }
+    return { nodes, edges };
   }
 
   async mergeBranches(preselectedHead?: string): Promise<void> {
@@ -543,11 +533,19 @@ export class AlembicService {
 
   private buildCommand(args: string[]): string[] {
     const config = ConfigurationManager.getConfiguration();
-    const alembicPath = config.alembicPath;
     const configFile = config.configFile;
 
-    const fullArgs = ["-c", configFile, ...args];
-    return [alembicPath, ...fullArgs];
+    // If pythonPath is configured and not default, use "python -m alembic"
+    // This ensures we use the correct virtual environment
+    if (config.pythonPath && config.pythonPath !== "python") {
+      const fullArgs = ["-m", "alembic", "-c", configFile, ...args];
+      return [config.pythonPath, ...fullArgs];
+    } else {
+      // Fallback to direct alembic command
+      const alembicPath = config.alembicPath;
+      const fullArgs = ["-c", configFile, ...args];
+      return [alembicPath, ...fullArgs];
+    }
   }
 
   private async executeCommand(
@@ -589,7 +587,19 @@ export class AlembicService {
         if (code === 0) {
           resolve(stdout);
         } else {
-          reject(new Error(stderr || `Process exited with code ${code}`));
+          const errorMsg = stderr || `Process exited with code ${code}`;
+
+          // Извлекаем основную ошибку из Python traceback
+          const lines = errorMsg.split('\n');
+          const mainError = lines.find(line =>
+            line.includes('ModuleNotFoundError') ||
+            line.includes('ImportError') ||
+            line.includes('Error:')
+          ) || lines[lines.length - 2] || errorMsg;
+
+          console.log('Showing Alembic error alert:', mainError.trim());
+          vscode.window.showErrorMessage(`Alembic error: ${mainError.trim()}`);
+          reject(new Error(errorMsg));
         }
       });
     });

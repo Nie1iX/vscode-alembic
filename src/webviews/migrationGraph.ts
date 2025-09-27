@@ -70,7 +70,9 @@ export class MigrationGraphWebview {
       });
     } catch (error) {
       console.error("Failed to update graph:", error);
-      vscode.window.showErrorMessage("Failed to load migration graph");
+      vscode.window.showErrorMessage(
+        `Failed to load migration graph: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 

@@ -26,68 +26,82 @@ export class AlembicMigrationProvider
   async getChildren(element?: MigrationItem): Promise<MigrationItem[]> {
     if (!element) {
       // Root level - return migration categories
-      const migrations = await this.alembicService.getMigrations();
-      if (migrations.length === 0) {
+      try {
+        const migrations = await this.alembicService.getMigrations();
+        if (migrations.length === 0) {
+          return [
+            new MigrationItem(
+              "No migrations found",
+              "",
+              vscode.TreeItemCollapsibleState.None,
+              "info",
+            ),
+          ];
+        }
+
+        const items: MigrationItem[] = [];
+
+        // Group migrations by status
+        const applied = migrations.filter((m) => m.isApplied && !m.isCurrent);
+        const current = migrations.filter((m) => m.isCurrent);
+        const pending = migrations.filter((m) => !m.isApplied);
+
+        if (current.length > 0) {
+          items.push(
+            new MigrationItem(
+              "Current",
+              "",
+              vscode.TreeItemCollapsibleState.Expanded,
+              "category",
+            ),
+          );
+          items.push(
+            ...current.map((m) => this.createMigrationItem(m, "current")),
+          );
+        }
+
+        if (applied.length > 0) {
+          items.push(
+            new MigrationItem(
+              "Applied",
+              "",
+              vscode.TreeItemCollapsibleState.Collapsed,
+              "category",
+            ),
+          );
+          items.push(
+            ...applied.map((m) => this.createMigrationItem(m, "applied")),
+          );
+        }
+
+        if (pending.length > 0) {
+          items.push(
+            new MigrationItem(
+              "Pending",
+              "",
+              vscode.TreeItemCollapsibleState.Collapsed,
+              "category",
+            ),
+          );
+          items.push(
+            ...pending.map((m) => this.createMigrationItem(m, "pending")),
+          );
+        }
+
+        return items;
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to load migrations: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
         return [
           new MigrationItem(
-            "No migrations found",
+            "Failed to load migrations",
             "",
             vscode.TreeItemCollapsibleState.None,
-            "info",
+            "error",
           ),
         ];
       }
-
-      const items: MigrationItem[] = [];
-
-      // Group migrations by status
-      const applied = migrations.filter((m) => m.isApplied && !m.isCurrent);
-      const current = migrations.filter((m) => m.isCurrent);
-      const pending = migrations.filter((m) => !m.isApplied);
-
-      if (current.length > 0) {
-        items.push(
-          new MigrationItem(
-            "Current",
-            "",
-            vscode.TreeItemCollapsibleState.Expanded,
-            "category",
-          ),
-        );
-        items.push(
-          ...current.map((m) => this.createMigrationItem(m, "current")),
-        );
-      }
-
-      if (applied.length > 0) {
-        items.push(
-          new MigrationItem(
-            "Applied",
-            "",
-            vscode.TreeItemCollapsibleState.Collapsed,
-            "category",
-          ),
-        );
-        items.push(
-          ...applied.map((m) => this.createMigrationItem(m, "applied")),
-        );
-      }
-
-      if (pending.length > 0) {
-        items.push(
-          new MigrationItem(
-            "Pending",
-            "",
-            vscode.TreeItemCollapsibleState.Collapsed,
-            "category",
-          ),
-        );
-        items.push(
-          ...pending.map((m) => this.createMigrationItem(m, "pending")),
-        );
-      }
-
-      return items;
     }
 
     return [];
