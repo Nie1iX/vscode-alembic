@@ -213,9 +213,18 @@ export class AlembicService {
     const historyResult = await this.executeCommand(
       this.buildCommand(["history"]),
     );
-    const currentResult = await this.executeCommand(
-      this.buildCommand(["current"]),
-    );
+
+    let currentResult = "";
+    try {
+      currentResult = await this.executeCommand(
+        this.buildCommand(["current"]),
+      );
+    } catch (error) {
+      // If current command fails (e.g., database not accessible),
+      // we can still show migrations from history
+      console.log('Failed to get current migration, showing history only:', error);
+      this.outputChannel.appendLine('Warning: Could not determine current migration (database not accessible)');
+    }
 
     const migrations = this.parseMigrations(historyResult, currentResult);
 
@@ -236,9 +245,9 @@ export class AlembicService {
         m.isApplied = applied.has(m.id);
       }
     } else {
-      // No current -> nothing applied
+      // No current -> can't determine status, mark all as unknown
       for (const m of migrations) {
-        m.isApplied = false;
+        m.isApplied = false; // Default to pending since we can't determine
       }
     }
 
@@ -591,14 +600,26 @@ export class AlembicService {
 
           // Извлекаем основную ошибку из Python traceback
           const lines = errorMsg.split('\n');
-          const mainError = lines.find(line =>
-            line.includes('ModuleNotFoundError') ||
-            line.includes('ImportError') ||
-            line.includes('Error:')
-          ) || lines[lines.length - 2] || errorMsg;
 
-          console.log('Showing Alembic error alert:', mainError.trim());
-          vscode.window.showErrorMessage(`Alembic error: ${mainError.trim()}`);
+          // Проверяем специфичные ошибки для более понятных сообщений
+          if (errorMsg.includes('socket.gaierror') || errorMsg.includes('Temporary failure in name resolution')) {
+            vscode.window.showErrorMessage(
+              'Alembic cannot connect to database. Make sure your database is running and accessible.'
+            );
+          } else if (errorMsg.includes('ModuleNotFoundError')) {
+            const moduleError = lines.find(line => line.includes('ModuleNotFoundError'));
+            vscode.window.showErrorMessage(`Missing Python module: ${moduleError?.trim() || 'Unknown module'}`);
+          } else {
+            const mainError = lines.find(line =>
+              line.includes('ImportError') ||
+              line.includes('Error:') ||
+              line.includes('Exception:')
+            ) || lines[lines.length - 2] || errorMsg;
+
+            vscode.window.showErrorMessage(`Alembic error: ${mainError.trim()}`);
+          }
+
+          console.log('Showing Alembic error alert for command:', command.join(' '));
           reject(new Error(errorMsg));
         }
       });
