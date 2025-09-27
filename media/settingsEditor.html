@@ -11,6 +11,7 @@
     .row { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
     .section { border: 1px solid var(--vscode-panel-border); background: var(--vscode-panel-background); padding: 12px; border-radius: 4px; margin-bottom: 12px; }
     label { width: 220px; color: var(--vscode-descriptionForeground); }
+    label.inline { width: auto; white-space: nowrap; }
     input, select, textarea { width: 100%; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 6px 8px; border-radius: 3px; }
     button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: 0; padding: 6px 10px; border-radius: 3px; cursor: pointer; }
     button:hover { background: var(--vscode-button-hoverBackground); }
@@ -47,9 +48,9 @@
             <option value="hybrid">Hybrid (0001_1a2b3c4d)</option>
           </select>
           <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
-            <label style="width:auto;">Seq width:</label>
+            <label class="inline">Seq width:</label>
             <input id="seqWidth" style="max-width:80px;" type="number" min="1" max="8" value="4" />
-            <label style="width:auto;">Hash length:</label>
+            <label class="inline">Hash length:</label>
             <input id="hashLength" style="max-width:80px;" type="number" min="4" max="16" value="8" />
           </div>
           <div class="help">
@@ -94,7 +95,7 @@
 
         <label>recursive_version_locations</label>
         <div>
-          <label style="width:auto; display:inline-flex; align-items:center; gap:8px;">
+          <label class="inline" style="display:inline-flex; align-items:center; gap:8px;">
             <input id="recursiveVersionLocations" type="checkbox" /> enable recursive search
           </label>
           <div class="help">Рекурсивный поиск файлов ревизий в поддиректориях version_locations.</div>
