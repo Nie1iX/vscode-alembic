@@ -42,7 +42,7 @@
    5.5. Приёмка: корректная запись/чтение.
    5.6. Оценка: S. Зависимости: нет.
 
-6. Post‑write hooks (black/ruff/autopep8/isort/zimports/pre-commit/custom)
+6. ✅ Post‑write hooks (black/ruff/autopep8/isort/zimports/pre-commit/custom) — **ВЫПОЛНЕНО**
    6.1. Описание: визуальный конфиг `[post_write_hooks]`.
    6.2. UI: мультиселект hooks; для каждого — `type`, `entrypoint`, `options`, `cwd`; пресеты; кнопка «Проверить наличие».
    6.3. Код: запись секции `[post_write_hooks]`; не ломать другие секции.

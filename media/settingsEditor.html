@@ -160,6 +160,54 @@
     </div>
 
     <div class="section">
+      <div class="row"><strong>Post-write Hooks (Code Formatters)</strong></div>
+      <div class="help" style="margin-bottom:10px;">Автоматическое форматирование файлов миграций после создания.</div>
+
+      <div id="hooksList" style="border: 1px solid var(--vscode-input-border); padding: 6px; border-radius: 3px; min-height: 60px; margin-bottom: 8px;">
+        <!-- hooks will be populated here -->
+      </div>
+
+      <div class="grid" style="grid-template-columns: 1fr; gap: 8px; margin-bottom: 8px;">
+        <div style="display: flex; gap: 8px;">
+          <button onclick="addHookFromPreset('black')" style="flex: 1;">+ Black</button>
+          <button onclick="addHookFromPreset('ruff')" style="flex: 1;">+ Ruff</button>
+          <button onclick="addHookFromPreset('isort')" style="flex: 1;">+ isort</button>
+          <button onclick="addHookFromPreset('autopep8')" style="flex: 1;">+ autopep8</button>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button onclick="showAddCustomHook()" style="flex: 1;">+ Custom Hook</button>
+          <button onclick="checkHookTools()" style="flex: 1;">Check Availability</button>
+          <button onclick="applyHooks()" style="flex: 1;">Apply Hooks</button>
+        </div>
+      </div>
+
+      <!-- Custom hook form (hidden by default) -->
+      <div id="customHookForm" style="display: none; border: 1px solid var(--vscode-input-border); padding: 10px; border-radius: 3px; margin-bottom: 8px;">
+        <div style="margin-bottom: 8px;"><strong>Add Custom Hook</strong></div>
+        <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px; align-items: center;">
+          <label>Hook Name:</label>
+          <input id="customHookName" type="text" placeholder="e.g., myformatter" />
+
+          <label>Type:</label>
+          <select id="customHookType">
+            <option value="console_scripts">console_scripts</option>
+            <option value="custom">custom</option>
+          </select>
+
+          <label>Entrypoint:</label>
+          <input id="customHookEntrypoint" type="text" placeholder="e.g., black" />
+
+          <label>Options:</label>
+          <input id="customHookOptions" type="text" placeholder="e.g., -l 79 REVISION_SCRIPT_FILENAME" />
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+          <button onclick="addCustomHook()">Add</button>
+          <button onclick="cancelCustomHook()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
       <div class="row"><strong>Raw alembic.ini</strong></div>
       <textarea id="raw" rows="24" spellcheck="false"></textarea>
       <div class="actions" style="margin-top:10px;"><button onclick="reloadIni()">Reload</button></div>
@@ -205,6 +253,9 @@
           const url = (s['alembic'] && s['alembic']['sqlalchemy.url']) || '';
           document.getElementById('sqlalchemyUrl').value = url;
           if (url) maskPasswordInDisplay();
+
+          // Load post-write hooks
+          loadHooks(s);
         }
       }
     });
@@ -534,6 +585,170 @@
           paths: prependSysPathData
         }
       });
+    }
+
+    // Post-write hooks management
+    let hooksData = [];
+
+    const hookPresets = {
+      black: {
+        name: 'black',
+        type: 'console_scripts',
+        entrypoint: 'black',
+        options: '-l 79 REVISION_SCRIPT_FILENAME'
+      },
+      ruff: {
+        name: 'ruff',
+        type: 'console_scripts',
+        entrypoint: 'ruff',
+        options: 'format REVISION_SCRIPT_FILENAME'
+      },
+      isort: {
+        name: 'isort',
+        type: 'console_scripts',
+        entrypoint: 'isort',
+        options: 'REVISION_SCRIPT_FILENAME'
+      },
+      autopep8: {
+        name: 'autopep8',
+        type: 'console_scripts',
+        entrypoint: 'autopep8',
+        options: '--in-place REVISION_SCRIPT_FILENAME'
+      },
+      zimports: {
+        name: 'zimports',
+        type: 'console_scripts',
+        entrypoint: 'zimports',
+        options: 'REVISION_SCRIPT_FILENAME'
+      }
+    };
+
+    function renderHooks() {
+      const container = document.getElementById('hooksList');
+      container.innerHTML = '';
+
+      if (hooksData.length === 0) {
+        container.innerHTML = '<div style="color: var(--vscode-descriptionForeground); font-style: italic;">No hooks configured</div>';
+        return;
+      }
+
+      hooksData.forEach((hook, index) => {
+        const item = document.createElement('div');
+        item.className = 'location-item';
+        item.style.marginBottom = '4px';
+        item.innerHTML = `
+          <div style="flex: 1;">
+            <strong>${hook.name}</strong> (${hook.type})
+            <div style="font-size: 11px; color: var(--vscode-descriptionForeground);">
+              ${hook.entrypoint} ${hook.options || ''}
+            </div>
+          </div>
+          <button onclick="removeHook(${index})">Remove</button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function addHookFromPreset(presetName) {
+      const preset = hookPresets[presetName];
+      if (!preset) {
+        alert('Unknown preset: ' + presetName);
+        return;
+      }
+
+      // Check if hook already exists
+      if (hooksData.some(h => h.name === preset.name)) {
+        alert(`Hook "${preset.name}" is already configured`);
+        return;
+      }
+
+      hooksData.push({ ...preset });
+      renderHooks();
+    }
+
+    function showAddCustomHook() {
+      document.getElementById('customHookForm').style.display = 'block';
+      document.getElementById('customHookName').value = '';
+      document.getElementById('customHookType').value = 'console_scripts';
+      document.getElementById('customHookEntrypoint').value = '';
+      document.getElementById('customHookOptions').value = '';
+    }
+
+    function cancelCustomHook() {
+      document.getElementById('customHookForm').style.display = 'none';
+    }
+
+    function addCustomHook() {
+      const name = document.getElementById('customHookName').value.trim();
+      const type = document.getElementById('customHookType').value;
+      const entrypoint = document.getElementById('customHookEntrypoint').value.trim();
+      const options = document.getElementById('customHookOptions').value.trim();
+
+      if (!name || !entrypoint) {
+        alert('Hook name and entrypoint are required');
+        return;
+      }
+
+      // Check if hook already exists
+      if (hooksData.some(h => h.name === name)) {
+        alert(`Hook "${name}" is already configured`);
+        return;
+      }
+
+      hooksData.push({ name, type, entrypoint, options });
+      renderHooks();
+      cancelCustomHook();
+    }
+
+    function removeHook(index) {
+      hooksData.splice(index, 1);
+      renderHooks();
+    }
+
+    function checkHookTools() {
+      if (hooksData.length === 0) {
+        alert('No hooks configured');
+        return;
+      }
+
+      const tools = hooksData.map(h => h.entrypoint);
+      vscode.postMessage({
+        command: 'checkHookTools',
+        payload: { tools }
+      });
+    }
+
+    function applyHooks() {
+      vscode.postMessage({
+        command: 'applyHooks',
+        payload: { hooks: hooksData }
+      });
+    }
+
+    function loadHooks(parsed) {
+      hooksData = [];
+
+      if (!parsed['post_write_hooks'] || !parsed['post_write_hooks']['hooks']) {
+        renderHooks();
+        return;
+      }
+
+      const hookNames = parsed['post_write_hooks']['hooks'].split(',').map(s => s.trim()).filter(s => s);
+
+      for (const hookName of hookNames) {
+        const sectionName = 'post_write_hooks.' + hookName;
+        if (parsed[sectionName]) {
+          const hook = {
+            name: hookName,
+            type: parsed[sectionName]['type'] || 'console_scripts',
+            entrypoint: parsed[sectionName]['entrypoint'] || hookName,
+            options: parsed[sectionName]['options'] || ''
+          };
+          hooksData.push(hook);
+        }
+      }
+
+      renderHooks();
     }
 
     // Add event listeners for password masking

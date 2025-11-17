@@ -45,6 +45,12 @@ export class AlembicIniEditorWebview {
         case "validatePrependSysPath":
           await this.validatePrependSysPath(message.payload);
           break;
+        case "checkHookTools":
+          await this.checkHookTools(message.payload);
+          break;
+        case "applyHooks":
+          await this.applyHooks(message.payload);
+          break;
       }
     });
 
@@ -420,5 +426,151 @@ export class AlembicIniEditorWebview {
     } else {
       vscode.window.showInformationMessage(message);
     }
+  }
+
+  private async checkHookTools(payload: { tools: string[] }): Promise<void> {
+    if (!payload.tools || payload.tools.length === 0) {
+      vscode.window.showInformationMessage("No tools to check");
+      return;
+    }
+
+    const cfg = ConfigurationManager.getConfiguration();
+    const pythonPath = cfg.pythonPath || "python";
+
+    const results: Array<{ tool: string; available: boolean }> = [];
+
+    for (const tool of payload.tools) {
+      try {
+        const { execFile } = await import("child_process");
+        const { promisify } = await import("util");
+        const execFilePromise = promisify(execFile);
+
+        try {
+          await execFilePromise(pythonPath, ["-m", tool, "--version"]);
+          results.push({ tool, available: true });
+        } catch {
+          // Try direct execution
+          try {
+            await execFilePromise(tool, ["--version"]);
+            results.push({ tool, available: true });
+          } catch {
+            results.push({ tool, available: false });
+          }
+        }
+      } catch {
+        results.push({ tool, available: false });
+      }
+    }
+
+    const available = results.filter((r) => r.available).map((r) => r.tool);
+    const missing = results.filter((r) => !r.available).map((r) => r.tool);
+
+    let message = "";
+    if (available.length > 0) {
+      message += `Available: ${available.join(", ")}`;
+    }
+    if (missing.length > 0) {
+      if (message) {
+        message += "; ";
+      }
+      message += `Missing: ${missing.join(", ")}`;
+    }
+
+    if (missing.length > 0) {
+      vscode.window.showWarningMessage(message);
+    } else {
+      vscode.window.showInformationMessage(message || "All tools are available");
+    }
+  }
+
+  private async applyHooks(payload: {
+    hooks: Array<{ name: string; type: string; entrypoint: string; options: string }>;
+  }): Promise<void> {
+    const cfg = ConfigurationManager.getConfiguration();
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+      return;
+    }
+    const uri = vscode.Uri.joinPath(folders[0].uri, cfg.configFile);
+
+    try {
+      const raw = (await vscode.workspace.fs.readFile(uri)).toString();
+      let updated = this.removeHookSections(raw);
+
+      if (payload.hooks.length > 0) {
+        const hookNames = payload.hooks.map((h) => h.name).join(",");
+        updated = this.updatePostWriteHooksMain(updated, hookNames);
+
+        for (const hook of payload.hooks) {
+          updated = this.updatePostWriteHookSection(updated, hook);
+        }
+      }
+
+      await vscode.workspace.fs.writeFile(uri, Buffer.from(updated, "utf8"));
+      vscode.window.showInformationMessage("Post-write hooks configuration updated");
+
+      if (this.panel) {
+        const { parseIni } = await import("../utils/iniEditor");
+        const parsed = parseIni(updated);
+        this.panel.webview.postMessage({
+          command: "setIni",
+          payload: { content: updated, parsed },
+        });
+      }
+    } catch (e) {
+      vscode.window.showErrorMessage(`Failed to update hooks: ${e}`);
+    }
+  }
+
+  private removeHookSections(content: string): string {
+    const lines = content.split(/\r?\n/);
+    const result: string[] = [];
+    let inHookSection = false;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("[post_write_hooks")) {
+        inHookSection = true;
+        continue;
+      }
+      if (trimmed.startsWith("[") && inHookSection) {
+        inHookSection = false;
+      }
+      if (!inHookSection) {
+        result.push(line);
+      }
+    }
+
+    return result.join("\n");
+  }
+
+  private updatePostWriteHooksMain(content: string, hookNames: string): string {
+    const lines = content.split(/\r?\n/);
+    const sectionHeader = "[post_write_hooks]";
+
+    // Add section at the end
+    if (!content.trim().endsWith("\n")) {
+      content += "\n";
+    }
+    content += `\n${sectionHeader}\n`;
+    content += `hooks = ${hookNames}\n`;
+
+    return content;
+  }
+
+  private updatePostWriteHookSection(
+    content: string,
+    hook: { name: string; type: string; entrypoint: string; options: string }
+  ): string {
+    const sectionHeader = `[post_write_hooks.${hook.name}]`;
+
+    content += `\n${sectionHeader}\n`;
+    content += `type = ${hook.type}\n`;
+    content += `entrypoint = ${hook.entrypoint}\n`;
+    if (hook.options && hook.options.trim()) {
+      content += `options = ${hook.options}\n`;
+    }
+
+    return content;
   }
 }
