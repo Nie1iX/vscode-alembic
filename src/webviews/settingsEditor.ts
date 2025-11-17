@@ -128,6 +128,8 @@ export class AlembicIniEditorWebview {
     prependSysPath?: string;
     timezone?: string;
     truncateSlug?: string;
+    sourceless?: boolean;
+    outputEncoding?: string;
     sqlalchemyUrl?: string;
   }): Promise<void> {
     const cfg = ConfigurationManager.getConfiguration();
@@ -166,6 +168,20 @@ export class AlembicIniEditorWebview {
       }
       if (payload.prependSysPath !== undefined && payload.prependSysPath.trim() !== "") {
         base["prepend_sys_path"] = payload.prependSysPath.trim();
+      }
+      if (payload.sourceless !== undefined) {
+        base["sourceless"] = payload.sourceless.toString();
+      }
+      if (payload.outputEncoding !== undefined && payload.outputEncoding.trim() !== "") {
+        // Validate encoding
+        const validEncodings = ["utf-8", "utf-16", "latin-1", "cp1252", "ascii"];
+        const encoding = payload.outputEncoding.trim().toLowerCase();
+        if (!validEncodings.includes(encoding)) {
+          vscode.window.showWarningMessage(
+            `Warning: "${encoding}" is not a common encoding. Supported: ${validEncodings.join(", ")}`
+          );
+        }
+        base["output_encoding"] = payload.outputEncoding.trim();
       }
       updated = updateIniSection(updated, "alembic", base);
 

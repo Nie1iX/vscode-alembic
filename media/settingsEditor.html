@@ -127,6 +127,27 @@
 
         <label>truncate_slug_length</label>
         <input id="truncateSlug" type="number" min="1" max="200" placeholder="40" />
+
+        <label>sourceless</label>
+        <div>
+          <label class="inline" style="display:inline-flex; align-items:center; gap:8px;">
+            <input id="sourceless" type="checkbox" /> enable sourceless mode
+          </label>
+          <div class="help">Использовать только .pyc файлы без исходных .py (для производства).</div>
+        </div>
+
+        <label>output_encoding</label>
+        <div>
+          <select id="outputEncoding">
+            <option value="">default (utf-8)</option>
+            <option value="utf-8">utf-8</option>
+            <option value="utf-16">utf-16</option>
+            <option value="latin-1">latin-1</option>
+            <option value="cp1252">cp1252 (Windows)</option>
+            <option value="ascii">ascii</option>
+          </select>
+          <div class="help">Кодировка для вывода миграций. По умолчанию используется UTF-8.</div>
+        </div>
       </div>
       <div class="actions" style="margin-top:10px;">
         <button onclick="applyTemplate()">Apply template</button>
@@ -179,6 +200,8 @@
 
           document.getElementById('timezone').value = (s['alembic'] && s['alembic']['timezone']) || '';
           document.getElementById('truncateSlug').value = (s['alembic'] && s['alembic']['truncate_slug_length']) || '';
+          document.getElementById('sourceless').checked = (s['alembic'] && s['alembic']['sourceless'] === 'true') || false;
+          document.getElementById('outputEncoding').value = (s['alembic'] && s['alembic']['output_encoding']) || '';
           const url = (s['alembic'] && s['alembic']['sqlalchemy.url']) || '';
           document.getElementById('sqlalchemyUrl').value = url;
           if (url) maskPasswordInDisplay();
@@ -209,6 +232,8 @@
       const prependSysPath = getPrependSysPath();
       const timezone = document.getElementById('timezone').value;
       const truncateSlug = document.getElementById('truncateSlug').value;
+      const sourceless = document.getElementById('sourceless').checked;
+      const outputEncoding = document.getElementById('outputEncoding').value;
       const sqlalchemyUrl = document.getElementById('sqlalchemyUrl').value;
 
       vscode.postMessage({
@@ -226,6 +251,8 @@
           prependSysPath,
           timezone,
           truncateSlug,
+          sourceless,
+          outputEncoding,
           sqlalchemyUrl
         }
       });
