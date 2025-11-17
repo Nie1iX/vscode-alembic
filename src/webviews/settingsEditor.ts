@@ -121,6 +121,7 @@ export class AlembicIniEditorWebview {
     versionLocations?: string;
     versionPathSeparator?: string;
     recursiveVersionLocations?: boolean;
+    revisionEnvironment?: boolean;
     timezone?: string;
     truncateSlug?: string;
     sqlalchemyUrl?: string;
@@ -156,6 +157,9 @@ export class AlembicIniEditorWebview {
       if (payload.recursiveVersionLocations !== undefined) {
         base["recursive_version_locations"] = payload.recursiveVersionLocations.toString();
       }
+      if (payload.revisionEnvironment !== undefined) {
+        base["revision_environment"] = payload.revisionEnvironment.toString();
+      }
       updated = updateIniSection(updated, "alembic", base);
 
       // persist revision ID strategy to settings
@@ -164,6 +168,12 @@ export class AlembicIniEditorWebview {
       await ConfigurationManager.updateConfiguration('sequentialRevIdWidth', payload.seqWidth || 4);
       await ConfigurationManager.updateConfiguration('hybridHashLength', payload.hashLength || 8);
       await vscode.workspace.fs.writeFile(uri, Buffer.from(updated, "utf8"));
+
+      // Validate env.py existence if revision_environment is enabled
+      if (payload.revisionEnvironment) {
+        await this.validateEnvPy(payload.scriptLocation || "alembic");
+      }
+
       vscode.window.showInformationMessage(
         "Revision strategy applied to alembic.ini",
       );
@@ -291,6 +301,30 @@ export class AlembicIniEditorWebview {
       );
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to create directories: ${e}`);
+    }
+  }
+
+  private async validateEnvPy(scriptLocation: string): Promise<void> {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+      return;
+    }
+
+    const base = folders[0].uri;
+    const join = (p: string) =>
+      p && (p.startsWith("/") || p.match(/^[A-Za-z]:/))
+        ? vscode.Uri.file(p)
+        : vscode.Uri.joinPath(base, p);
+
+    const envPyUri = vscode.Uri.joinPath(join(scriptLocation), "env.py");
+
+    try {
+      await vscode.workspace.fs.stat(envPyUri);
+    } catch {
+      vscode.window.showWarningMessage(
+        `revision_environment is enabled, but env.py was not found at ${scriptLocation}/env.py. ` +
+        `This may cause issues when creating revisions.`
+      );
     }
   }
 }

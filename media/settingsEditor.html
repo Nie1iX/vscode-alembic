@@ -101,6 +101,14 @@
           <div class="help">Рекурсивный поиск файлов ревизий в поддиректориях version_locations.</div>
         </div>
 
+        <label>revision_environment</label>
+        <div>
+          <label class="inline" style="display:inline-flex; align-items:center; gap:8px;">
+            <input id="revisionEnvironment" type="checkbox" /> load env.py on revision
+          </label>
+          <div class="help">Загружать env.py при создании ревизий (нужно для кастомных хук-типов).</div>
+        </div>
+
         <label>timezone</label>
         <input id="timezone" type="text" placeholder="e.g. Europe/Berlin or leave blank" />
 
@@ -150,6 +158,7 @@
           const displaySeparator = savedSeparator === 'space' ? ' ' : savedSeparator;
           document.getElementById('versionPathSeparator').value = displaySeparator;
           document.getElementById('recursiveVersionLocations').checked = (s['alembic'] && s['alembic']['recursive_version_locations'] === 'true') || false;
+          document.getElementById('revisionEnvironment').checked = (s['alembic'] && s['alembic']['revision_environment'] === 'true') || false;
 
           document.getElementById('timezone').value = (s['alembic'] && s['alembic']['timezone']) || '';
           document.getElementById('truncateSlug').value = (s['alembic'] && s['alembic']['truncate_slug_length']) || '';
@@ -179,6 +188,7 @@
       const versionLocations = getVersionLocations();
       const versionPathSeparator = document.getElementById('versionPathSeparator').value;
       const recursiveVersionLocations = document.getElementById('recursiveVersionLocations').checked;
+      const revisionEnvironment = document.getElementById('revisionEnvironment').checked;
       const timezone = document.getElementById('timezone').value;
       const truncateSlug = document.getElementById('truncateSlug').value;
       const sqlalchemyUrl = document.getElementById('sqlalchemyUrl').value;
@@ -194,6 +204,7 @@
           versionLocations,
           versionPathSeparator,
           recursiveVersionLocations,
+          revisionEnvironment,
           timezone,
           truncateSlug,
           sqlalchemyUrl

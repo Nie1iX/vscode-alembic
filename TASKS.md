@@ -18,7 +18,7 @@
    2.5. Приёмка: корректная запись ключей и валидация; создаёт папки по запросу.
    2.6. Оценка: M. Зависимости: 1.
 
-3. revision_environment toggle
+3. ✅ revision_environment toggle — **ВЫПОЛНЕНО**
    3.1. Описание: включение загрузки `env.py` при `revision` (нужно для кастомных хук‑типов).
    3.2. UI: чекбокс в секции alembic.ini.
    3.3. Код: `[alembic].revision_environment = true/false`.
