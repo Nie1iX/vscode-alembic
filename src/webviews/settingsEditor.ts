@@ -42,6 +42,9 @@ export class AlembicIniEditorWebview {
         case "validateVersionLocations":
           await this.validateVersionLocations(message.payload);
           break;
+        case "validatePrependSysPath":
+          await this.validatePrependSysPath(message.payload);
+          break;
       }
     });
 
@@ -122,6 +125,7 @@ export class AlembicIniEditorWebview {
     versionPathSeparator?: string;
     recursiveVersionLocations?: boolean;
     revisionEnvironment?: boolean;
+    prependSysPath?: string;
     timezone?: string;
     truncateSlug?: string;
     sqlalchemyUrl?: string;
@@ -159,6 +163,9 @@ export class AlembicIniEditorWebview {
       }
       if (payload.revisionEnvironment !== undefined) {
         base["revision_environment"] = payload.revisionEnvironment.toString();
+      }
+      if (payload.prependSysPath !== undefined && payload.prependSysPath.trim() !== "") {
+        base["prepend_sys_path"] = payload.prependSysPath.trim();
       }
       updated = updateIniSection(updated, "alembic", base);
 
@@ -325,6 +332,77 @@ export class AlembicIniEditorWebview {
         `revision_environment is enabled, but env.py was not found at ${scriptLocation}/env.py. ` +
         `This may cause issues when creating revisions.`
       );
+    }
+  }
+
+  private async validatePrependSysPath(payload: { paths: string[] }): Promise<void> {
+    if (!this.panel) {
+      return;
+    }
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+      vscode.window.showErrorMessage("Open a workspace to validate paths");
+      return;
+    }
+
+    const base = folders[0].uri;
+    const join = (p: string) =>
+      p && (p.startsWith("/") || p.match(/^[A-Za-z]:/))
+        ? vscode.Uri.file(p)
+        : vscode.Uri.joinPath(base, p);
+
+    const exists = async (u: vscode.Uri) => {
+      try {
+        await vscode.workspace.fs.stat(u);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const results: Array<{ path: string; exists: boolean; isEnvVar: boolean }> = [];
+    for (const path of payload.paths) {
+      if (path.trim()) {
+        // Check if path contains environment variable syntax
+        const isEnvVar = path.includes("${") || path.includes("$");
+        if (isEnvVar) {
+          results.push({ path: path.trim(), exists: true, isEnvVar: true });
+        } else {
+          const pathExists = await exists(join(path.trim()));
+          results.push({ path: path.trim(), exists: pathExists, isEnvVar: false });
+        }
+      }
+    }
+
+    const missingPaths = results.filter((r) => !r.exists && !r.isEnvVar);
+    const envVarPaths = results.filter((r) => r.isEnvVar);
+
+    let message = "";
+    if (missingPaths.length > 0) {
+      message += `Missing paths: ${missingPaths.map((r) => r.path).join(", ")}`;
+    }
+    if (envVarPaths.length > 0) {
+      if (message) {
+        message += "; ";
+      }
+      message += `Environment variables detected (not validated): ${envVarPaths.map((r) => r.path).join(", ")}`;
+    }
+    if (missingPaths.length === 0 && envVarPaths.length === 0) {
+      message = `All prepend_sys_path entries exist (${results.length} paths validated)`;
+    }
+
+    if (missingPaths.length > 0) {
+      const createChoice = await vscode.window.showWarningMessage(
+        message,
+        "Create missing directories",
+        "Cancel"
+      );
+
+      if (createChoice === "Create missing directories") {
+        await this.createMissingDirectories(missingPaths.map((r) => r.path));
+      }
+    } else {
+      vscode.window.showInformationMessage(message);
     }
   }
 }

@@ -109,6 +109,19 @@
           <div class="help">Загружать env.py при создании ревизий (нужно для кастомных хук-типов).</div>
         </div>
 
+        <label>prepend_sys_path</label>
+        <div>
+          <div id="prependSysPathList" style="border: 1px solid var(--vscode-input-border); padding: 6px; border-radius: 3px; min-height: 40px; margin-bottom: 8px;">
+            <!-- prepend_sys_path entries will be populated here -->
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input id="newPrependSysPath" type="text" placeholder="Enter path to prepend to sys.path..." style="flex: 1;" />
+            <button onclick="addPrependSysPath()" style="padding: 4px 8px;">Add</button>
+            <button onclick="validatePrependSysPath()" style="padding: 4px 8px;">Validate</button>
+          </div>
+          <div class="help">Пути, добавляемые в sys.path перед импортом модулей. Поддерживаются переменные окружения.</div>
+        </div>
+
         <label>timezone</label>
         <input id="timezone" type="text" placeholder="e.g. Europe/Berlin or leave blank" />
 
@@ -160,6 +173,10 @@
           document.getElementById('recursiveVersionLocations').checked = (s['alembic'] && s['alembic']['recursive_version_locations'] === 'true') || false;
           document.getElementById('revisionEnvironment').checked = (s['alembic'] && s['alembic']['revision_environment'] === 'true') || false;
 
+          // Handle prepend_sys_path as multi-value
+          const prependSysPath = (s['alembic'] && s['alembic']['prepend_sys_path']) || '';
+          setPrependSysPath(prependSysPath);
+
           document.getElementById('timezone').value = (s['alembic'] && s['alembic']['timezone']) || '';
           document.getElementById('truncateSlug').value = (s['alembic'] && s['alembic']['truncate_slug_length']) || '';
           const url = (s['alembic'] && s['alembic']['sqlalchemy.url']) || '';
@@ -189,6 +206,7 @@
       const versionPathSeparator = document.getElementById('versionPathSeparator').value;
       const recursiveVersionLocations = document.getElementById('recursiveVersionLocations').checked;
       const revisionEnvironment = document.getElementById('revisionEnvironment').checked;
+      const prependSysPath = getPrependSysPath();
       const timezone = document.getElementById('timezone').value;
       const truncateSlug = document.getElementById('truncateSlug').value;
       const sqlalchemyUrl = document.getElementById('sqlalchemyUrl').value;
@@ -205,6 +223,7 @@
           versionPathSeparator,
           recursiveVersionLocations,
           revisionEnvironment,
+          prependSysPath,
           timezone,
           truncateSlug,
           sqlalchemyUrl
@@ -397,6 +416,99 @@
       });
     }
 
+    // Prepend sys path management
+    let prependSysPathData = [];
+
+    function setPrependSysPath(pathsString) {
+      if (!pathsString || pathsString.trim() === '') {
+        prependSysPathData = [];
+        renderPrependSysPath();
+        return;
+      }
+
+      // Parse using os.pathsep (: on Unix, ; on Windows)
+      const sep = navigator.platform.includes('Win') ? ';' : ':';
+      let paths = [];
+      if (pathsString.includes(sep)) {
+        paths = pathsString.split(sep);
+      } else if (pathsString.includes(':') && sep !== ':') {
+        paths = pathsString.split(':');
+      } else if (pathsString.includes(';') && sep !== ';') {
+        paths = pathsString.split(';');
+      } else {
+        paths = [pathsString];
+      }
+
+      prependSysPathData = paths.map(s => s.trim()).filter(s => s.length > 0);
+      renderPrependSysPath();
+    }
+
+    function getPrependSysPath() {
+      const sep = navigator.platform.includes('Win') ? ';' : ':';
+      return prependSysPathData.join(sep);
+    }
+
+    function renderPrependSysPath() {
+      const container = document.getElementById('prependSysPathList');
+      container.innerHTML = '';
+
+      if (prependSysPathData.length === 0) {
+        container.innerHTML = '<div style="color: var(--vscode-descriptionForeground); font-style: italic;">No paths defined</div>';
+        return;
+      }
+
+      prependSysPathData.forEach((path, index) => {
+        const item = document.createElement('div');
+        item.className = 'location-item';
+        item.innerHTML = `
+          <span>${path}</span>
+          <button onclick="removePrependSysPath(${index})">Remove</button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function addPrependSysPath() {
+      const input = document.getElementById('newPrependSysPath');
+      const value = input.value.trim();
+
+      if (!value) {
+        alert('Please enter a path');
+        return;
+      }
+
+      if (prependSysPathData.includes(value)) {
+        alert('This path is already in the list');
+        return;
+      }
+
+      // Check for potentially problematic characters (excluding env var syntax)
+      const problematicChars = ['|', '<', '>', '"', '?', '*'];
+      const hasProblematic = problematicChars.some(char => value.includes(char));
+      if (hasProblematic) {
+        alert('Path contains invalid characters: ' + problematicChars.filter(char => value.includes(char)).join(', '));
+        return;
+      }
+
+      prependSysPathData.push(value);
+      input.value = '';
+      renderPrependSysPath();
+    }
+
+    function removePrependSysPath(index) {
+      prependSysPathData.splice(index, 1);
+      renderPrependSysPath();
+    }
+
+    function validatePrependSysPath() {
+      vscode.postMessage({
+        command: 'validatePrependSysPath',
+        payload: {
+          paths: prependSysPathData
+        }
+      });
+    }
+
     // Add event listeners for password masking
     document.addEventListener('DOMContentLoaded', function() {
       const urlInput = document.getElementById('sqlalchemyUrl');
@@ -414,6 +526,14 @@
       newLocationInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
           addVersionLocation();
+        }
+      });
+
+      // Add enter key support for adding prepend_sys_path
+      const newPrependSysPathInput = document.getElementById('newPrependSysPath');
+      newPrependSysPathInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          addPrependSysPath();
         }
       });
 
