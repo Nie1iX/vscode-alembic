@@ -54,6 +54,20 @@ export class AlembicIniEditorWebview {
         case "applyLogging":
           await this.applyLogging(message.payload);
           break;
+        case "applyEnvFilters":
+          await this.applyEnvFilters(message.payload);
+          break;
+        case "previewEnvChanges":
+          await this.previewEnvChanges(message.payload);
+          break;
+        case "restoreEnvBackup":
+          await this.restoreEnvBackup();
+          break;
+        case "showError":
+          vscode.window.showErrorMessage(
+            message.payload?.message || "An error occurred",
+          );
+          break;
       }
     });
 
@@ -711,5 +725,202 @@ export class AlembicIniEditorWebview {
     content += "datefmt = %H:%M:%S\n";
 
     return content;
+  }
+
+  /**
+   * Applies env.py filters configuration
+   */
+  private async applyEnvFilters(payload: {
+    includeSchemas: boolean;
+    filters: Array<{
+      type: "schema" | "table" | "glob" | "regex";
+      pattern: string;
+      mode: "include" | "exclude";
+    }>;
+  }): Promise<void> {
+    const { EnvPyEditor } = await import("../utils/envPyEditor");
+    const cfg = ConfigurationManager.getConfiguration();
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+      return;
+    }
+
+    // Find env.py in script_location
+    const iniUri = vscode.Uri.joinPath(folders[0].uri, cfg.configFile);
+    let scriptLocation = "alembic";
+
+    try {
+      const raw = (await vscode.workspace.fs.readFile(iniUri)).toString();
+      const match = raw.match(/^[ \t]*script_location\s*=\s*(.+)$/m);
+      if (match) {
+        scriptLocation = match[1].trim();
+      }
+    } catch (e) {
+      // Use default
+    }
+
+    const envPyUri = vscode.Uri.joinPath(
+      folders[0].uri,
+      scriptLocation,
+      "env.py",
+    );
+
+    try {
+      // Validate env.py exists
+      const isValid = await EnvPyEditor.validateEnvPy(envPyUri);
+      if (!isValid) {
+        vscode.window.showErrorMessage(
+          `env.py not found or invalid at ${scriptLocation}/env.py`,
+        );
+        return;
+      }
+
+      // Create backup
+      await EnvPyEditor.createBackup(envPyUri);
+
+      // Apply patches
+      await EnvPyEditor.patchEnvPy(envPyUri, {
+        includeSchemas: payload.includeSchemas,
+        filters: payload.filters,
+      });
+
+      vscode.window.showInformationMessage(
+        "env.py filters applied. Backup created at env.py.backup",
+      );
+    } catch (e) {
+      vscode.window.showErrorMessage(`Failed to apply env.py filters: ${e}`);
+    }
+  }
+
+  /**
+   * Previews env.py changes before applying
+   */
+  private async previewEnvChanges(payload: {
+    includeSchemas: boolean;
+    filters: Array<{
+      type: "schema" | "table" | "glob" | "regex";
+      pattern: string;
+      mode: "include" | "exclude";
+    }>;
+  }): Promise<void> {
+    const { EnvPyEditor } = await import("../utils/envPyEditor");
+    const cfg = ConfigurationManager.getConfiguration();
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+      return;
+    }
+
+    // Find env.py in script_location
+    const iniUri = vscode.Uri.joinPath(folders[0].uri, cfg.configFile);
+    let scriptLocation = "alembic";
+
+    try {
+      const raw = (await vscode.workspace.fs.readFile(iniUri)).toString();
+      const match = raw.match(/^[ \t]*script_location\s*=\s*(.+)$/m);
+      if (match) {
+        scriptLocation = match[1].trim();
+      }
+    } catch (e) {
+      // Use default
+    }
+
+    const envPyUri = vscode.Uri.joinPath(
+      folders[0].uri,
+      scriptLocation,
+      "env.py",
+    );
+
+    try {
+      // Validate env.py exists
+      const isValid = await EnvPyEditor.validateEnvPy(envPyUri);
+      if (!isValid) {
+        vscode.window.showErrorMessage(
+          `env.py not found or invalid at ${scriptLocation}/env.py`,
+        );
+        return;
+      }
+
+      // Create a temporary preview file
+      const originalContent = (
+        await vscode.workspace.fs.readFile(envPyUri)
+      ).toString();
+      const tempUri = vscode.Uri.file(envPyUri.fsPath + ".preview");
+      await vscode.workspace.fs.writeFile(
+        tempUri,
+        Buffer.from(originalContent, "utf8"),
+      );
+
+      // Apply patches to preview
+      await EnvPyEditor.patchEnvPy(tempUri, {
+        includeSchemas: payload.includeSchemas,
+        filters: payload.filters,
+      });
+
+      // Open diff view
+      await vscode.commands.executeCommand(
+        "vscode.diff",
+        envPyUri,
+        tempUri,
+        "env.py Changes Preview (Original ↔ New)",
+      );
+
+      // Clean up temp file after a delay
+      setTimeout(async () => {
+        try {
+          await vscode.workspace.fs.delete(tempUri);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }, 30000); // Delete after 30 seconds
+    } catch (e) {
+      vscode.window.showErrorMessage(`Failed to preview env.py changes: ${e}`);
+    }
+  }
+
+  /**
+   * Restores env.py from backup
+   */
+  private async restoreEnvBackup(): Promise<void> {
+    const { EnvPyEditor } = await import("../utils/envPyEditor");
+    const cfg = ConfigurationManager.getConfiguration();
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+      return;
+    }
+
+    // Find env.py in script_location
+    const iniUri = vscode.Uri.joinPath(folders[0].uri, cfg.configFile);
+    let scriptLocation = "alembic";
+
+    try {
+      const raw = (await vscode.workspace.fs.readFile(iniUri)).toString();
+      const match = raw.match(/^[ \t]*script_location\s*=\s*(.+)$/m);
+      if (match) {
+        scriptLocation = match[1].trim();
+      }
+    } catch (e) {
+      // Use default
+    }
+
+    const envPyUri = vscode.Uri.joinPath(
+      folders[0].uri,
+      scriptLocation,
+      "env.py",
+    );
+    const backupUri = vscode.Uri.file(envPyUri.fsPath + ".backup");
+
+    try {
+      // Check if backup exists
+      await vscode.workspace.fs.stat(backupUri);
+
+      // Restore from backup
+      await EnvPyEditor.restoreFromBackup(envPyUri, backupUri);
+
+      vscode.window.showInformationMessage("env.py restored from backup");
+    } catch (e) {
+      vscode.window.showErrorMessage(
+        `Failed to restore env.py from backup: ${e}. Backup file may not exist.`,
+      );
+    }
   }
 }

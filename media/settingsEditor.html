@@ -246,6 +246,55 @@
     </div>
 
     <div class="section">
+      <div class="row"><strong>env.py Filters (autogenerate)</strong></div>
+      <div class="help" style="margin-bottom:10px;">Настройка фильтров для автогенерации миграций: выбор схем и таблиц.</div>
+
+      <div class="grid" style="grid-template-columns: 220px 1fr; gap: 10px; align-items: start;">
+        <label>Include schemas</label>
+        <div>
+          <label class="inline" style="display:inline-flex; align-items:center; gap:8px;">
+            <input id="includeSchemas" type="checkbox" /> enable schema reflection
+          </label>
+          <div class="help">Включить параметр include_schemas=True в context.configure().</div>
+        </div>
+
+        <label>Object filters</label>
+        <div>
+          <div id="filtersList" style="border: 1px solid var(--vscode-input-border); padding: 6px; border-radius: 3px; min-height: 60px; margin-bottom: 8px;">
+            <!-- filters will be populated here -->
+          </div>
+          <div style="display: grid; grid-template-columns: 120px 1fr 120px 80px auto; gap: 8px; align-items: center; margin-bottom: 8px;">
+            <select id="newFilterType">
+              <option value="schema">Schema</option>
+              <option value="table">Table</option>
+              <option value="glob">Glob</option>
+              <option value="regex">Regex</option>
+            </select>
+            <input id="newFilterPattern" type="text" placeholder="Pattern (e.g., public, users_*, ^temp_)" />
+            <select id="newFilterMode">
+              <option value="include">Include</option>
+              <option value="exclude">Exclude</option>
+            </select>
+            <button onclick="addFilter()" style="padding: 4px 8px;">Add</button>
+          </div>
+          <div class="help">
+            Добавьте правила для фильтрации объектов БД при автогенерации.<br>
+            <strong>Schema:</strong> фильтр по имени схемы (точное совпадение)<br>
+            <strong>Table:</strong> фильтр по имени таблицы (точное совпадение)<br>
+            <strong>Glob:</strong> шаблон с * и ? (например, temp_*)<br>
+            <strong>Regex:</strong> регулярное выражение (например, ^(staging|test)_)
+          </div>
+        </div>
+      </div>
+
+      <div class="actions" style="margin-top:10px;">
+        <button onclick="applyEnvFilters()">Apply Filters to env.py</button>
+        <button onclick="previewEnvChanges()" style="background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);">Preview Changes</button>
+        <button onclick="restoreEnvBackup()" style="background: var(--vscode-editorWarning-foreground); color: var(--vscode-editor-background);">Restore Backup</button>
+      </div>
+    </div>
+
+    <div class="section">
       <div class="row"><strong>Raw alembic.ini</strong></div>
       <textarea id="raw" rows="24" spellcheck="false"></textarea>
       <div class="actions" style="margin-top:10px;"><button onclick="reloadIni()">Reload</button></div>
@@ -833,6 +882,90 @@
       });
     }
 
+    // env.py Filters management
+    let filtersData = [];
+
+    function addFilter() {
+      const type = document.getElementById('newFilterType').value;
+      const pattern = document.getElementById('newFilterPattern').value.trim();
+      const mode = document.getElementById('newFilterMode').value;
+
+      if (!pattern) {
+        vscode.postMessage({ command: 'showError', payload: { message: 'Pattern cannot be empty' } });
+        return;
+      }
+
+      filtersData.push({ type, pattern, mode });
+      document.getElementById('newFilterPattern').value = '';
+      renderFilters();
+    }
+
+    function removeFilter(index) {
+      filtersData.splice(index, 1);
+      renderFilters();
+    }
+
+    function renderFilters() {
+      const container = document.getElementById('filtersList');
+      if (filtersData.length === 0) {
+        container.innerHTML = '<div style="color: var(--vscode-descriptionForeground); font-size: 12px; padding: 8px;">No filters configured</div>';
+        return;
+      }
+
+      container.innerHTML = filtersData.map((filter, index) => {
+        const modeColor = filter.mode === 'include' ? 'var(--vscode-charts-green)' : 'var(--vscode-charts-red)';
+        return `
+          <div class="location-item">
+            <span>
+              <strong style="color: ${modeColor};">[${filter.mode}]</strong>
+              <strong>${filter.type}:</strong> ${filter.pattern}
+            </span>
+            <button onclick="removeFilter(${index})">Remove</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function loadEnvFilters(config) {
+      if (config && config.includeSchemas !== undefined) {
+        document.getElementById('includeSchemas').checked = config.includeSchemas;
+      }
+      if (config && Array.isArray(config.filters)) {
+        filtersData = config.filters;
+        renderFilters();
+      }
+    }
+
+    function applyEnvFilters() {
+      const includeSchemas = document.getElementById('includeSchemas').checked;
+
+      vscode.postMessage({
+        command: 'applyEnvFilters',
+        payload: {
+          includeSchemas,
+          filters: filtersData
+        }
+      });
+    }
+
+    function previewEnvChanges() {
+      const includeSchemas = document.getElementById('includeSchemas').checked;
+
+      vscode.postMessage({
+        command: 'previewEnvChanges',
+        payload: {
+          includeSchemas,
+          filters: filtersData
+        }
+      });
+    }
+
+    function restoreEnvBackup() {
+      if (confirm('Are you sure you want to restore env.py from backup? This will undo all filter changes.')) {
+        vscode.postMessage({ command: 'restoreEnvBackup' });
+      }
+    }
+
     // Add event listeners for password masking
     document.addEventListener('DOMContentLoaded', function() {
       const urlInput = document.getElementById('sqlalchemyUrl');
@@ -858,6 +991,14 @@
       newPrependSysPathInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
           addPrependSysPath();
+        }
+      });
+
+      // Add enter key support for adding filters
+      const newFilterPatternInput = document.getElementById('newFilterPattern');
+      newFilterPatternInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          addFilter();
         }
       });
 

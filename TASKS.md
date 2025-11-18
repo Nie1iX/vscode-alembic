@@ -58,7 +58,7 @@
    7.5. Приёмка: логи идут в консоль/файл согласно настройке, ini сохраняется без потери комментариев.
    7.6. Оценка: M. Зависимости: нет.
 
-8. context.configure — include_schemas, include_object/include_name
+8. ✅ context.configure — include_schemas, include_object/include_name — **ВЫПОЛНЕНО**
    8.1. Описание: добавить toggles и шаблонные фильтры (by schema/table/glob/regex) в `env.py`.
    8.2. UI: форма фильтров; предпросмотр: «какие таблицы попадут» (best effort, по подключению опционально позже).
    8.3. Код: безопасный патч `env.py`: внедрение функций `include_object`/`include_name` и параметров `include_schemas=True`.
