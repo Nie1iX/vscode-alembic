@@ -50,7 +50,7 @@
    6.5. Приёмка: корректная сериализация/десериализация, пресеты создают рабочую конфигурацию.
    6.6. Оценка: M-L. Зависимости: 1.
 
-7. Логирование в ini (logging/handlers/formatters)
+7. ✅ Логирование в ini (logging/handlers/formatters) — **ВЫПОЛНЕНО**
    7.1. Описание: настраивать уровни `logger_alembic`, `logger_sqlalchemy`, console/file handler.
    7.2. UI: селект уровня (ERROR/WARN/INFO/DEBUG), чекбокс «Лог в файл», путь к файлу.
    7.3. Код: создавать/обновлять секции `[logging]`, `[logger_*]`, `[handler_*]`, `[formatter_generic]`.

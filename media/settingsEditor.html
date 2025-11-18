@@ -208,6 +208,44 @@
     </div>
 
     <div class="section">
+      <div class="row"><strong>Logging Configuration</strong></div>
+      <div class="help" style="margin-bottom:10px;">Настройка уровней логирования для Alembic и SQLAlchemy.</div>
+
+      <div class="grid" style="grid-template-columns: 220px 1fr; gap: 10px; align-items: center;">
+        <label>Alembic log level</label>
+        <select id="alembicLogLevel">
+          <option value="WARN">WARN (default)</option>
+          <option value="INFO">INFO</option>
+          <option value="DEBUG">DEBUG</option>
+          <option value="ERROR">ERROR</option>
+        </select>
+
+        <label>SQLAlchemy log level</label>
+        <select id="sqlalchemyLogLevel">
+          <option value="WARN">WARN (default)</option>
+          <option value="INFO">INFO</option>
+          <option value="DEBUG">DEBUG</option>
+          <option value="ERROR">ERROR</option>
+        </select>
+
+        <label>Log to file</label>
+        <div>
+          <label class="inline" style="display:inline-flex; align-items:center; gap:8px;">
+            <input id="logToFile" type="checkbox" /> enable file logging
+          </label>
+          <div class="help">Добавить handler для записи логов в файл.</div>
+        </div>
+
+        <label>Log file path</label>
+        <input id="logFilePath" type="text" placeholder="alembic.log" />
+      </div>
+
+      <div class="actions" style="margin-top:10px;">
+        <button onclick="applyLogging()">Apply Logging Config</button>
+      </div>
+    </div>
+
+    <div class="section">
       <div class="row"><strong>Raw alembic.ini</strong></div>
       <textarea id="raw" rows="24" spellcheck="false"></textarea>
       <div class="actions" style="margin-top:10px;"><button onclick="reloadIni()">Reload</button></div>
@@ -256,6 +294,9 @@
 
           // Load post-write hooks
           loadHooks(s);
+
+          // Load logging configuration
+          loadLoggingConfig(s);
         }
       }
     });
@@ -749,6 +790,47 @@
       }
 
       renderHooks();
+    }
+
+    // Logging configuration management
+    function loadLoggingConfig(parsed) {
+      // Load logger levels
+      const alembicLevel = (parsed['logger_alembic'] && parsed['logger_alembic']['level']) || 'WARN';
+      const sqlalchemyLevel = (parsed['logger_sqlalchemy'] && parsed['logger_sqlalchemy']['level']) || 'WARN';
+
+      document.getElementById('alembicLogLevel').value = alembicLevel;
+      document.getElementById('sqlalchemyLogLevel').value = sqlalchemyLevel;
+
+      // Check if file handler exists
+      const hasFileHandler = parsed['handler_file'] !== undefined;
+      document.getElementById('logToFile').checked = hasFileHandler;
+
+      if (hasFileHandler && parsed['handler_file']['args']) {
+        // Extract filename from args like "('alembic.log', 'w')"
+        const argsMatch = parsed['handler_file']['args'].match(/['"]([^'"]+)['"]/);
+        if (argsMatch) {
+          document.getElementById('logFilePath').value = argsMatch[1];
+        }
+      } else {
+        document.getElementById('logFilePath').value = 'alembic.log';
+      }
+    }
+
+    function applyLogging() {
+      const alembicLevel = document.getElementById('alembicLogLevel').value;
+      const sqlalchemyLevel = document.getElementById('sqlalchemyLogLevel').value;
+      const logToFile = document.getElementById('logToFile').checked;
+      const logFilePath = document.getElementById('logFilePath').value || 'alembic.log';
+
+      vscode.postMessage({
+        command: 'applyLogging',
+        payload: {
+          alembicLevel,
+          sqlalchemyLevel,
+          logToFile,
+          logFilePath
+        }
+      });
     }
 
     // Add event listeners for password masking

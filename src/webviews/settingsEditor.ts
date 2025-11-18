@@ -51,6 +51,9 @@ export class AlembicIniEditorWebview {
         case "applyHooks":
           await this.applyHooks(message.payload);
           break;
+        case "applyLogging":
+          await this.applyLogging(message.payload);
+          break;
       }
     });
 
@@ -570,6 +573,142 @@ export class AlembicIniEditorWebview {
     if (hook.options && hook.options.trim()) {
       content += `options = ${hook.options}\n`;
     }
+
+    return content;
+  }
+
+  private async applyLogging(payload: {
+    alembicLevel: string;
+    sqlalchemyLevel: string;
+    logToFile: boolean;
+    logFilePath: string;
+  }): Promise<void> {
+    const cfg = ConfigurationManager.getConfiguration();
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+      return;
+    }
+    const uri = vscode.Uri.joinPath(folders[0].uri, cfg.configFile);
+
+    try {
+      const raw = (await vscode.workspace.fs.readFile(uri)).toString();
+      let updated = this.removeLoggingSections(raw);
+      updated = this.addLoggingSections(updated, payload);
+
+      await vscode.workspace.fs.writeFile(uri, Buffer.from(updated, "utf8"));
+      vscode.window.showInformationMessage("Logging configuration updated");
+
+      if (this.panel) {
+        const { parseIni } = await import("../utils/iniEditor");
+        const parsed = parseIni(updated);
+        this.panel.webview.postMessage({
+          command: "setIni",
+          payload: { content: updated, parsed },
+        });
+      }
+    } catch (e) {
+      vscode.window.showErrorMessage(`Failed to update logging configuration: ${e}`);
+    }
+  }
+
+  private removeLoggingSections(content: string): string {
+    const lines = content.split(/\r?\n/);
+    const result: string[] = [];
+    let inLoggingSection = false;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Remove all logging-related sections
+      if (
+        trimmed.startsWith("[loggers]") ||
+        trimmed.startsWith("[handlers]") ||
+        trimmed.startsWith("[formatters]") ||
+        trimmed.startsWith("[logger_") ||
+        trimmed.startsWith("[handler_") ||
+        trimmed.startsWith("[formatter_")
+      ) {
+        inLoggingSection = true;
+        continue;
+      }
+      if (trimmed.startsWith("[") && inLoggingSection) {
+        inLoggingSection = false;
+      }
+      if (!inLoggingSection) {
+        result.push(line);
+      }
+    }
+
+    return result.join("\n");
+  }
+
+  private addLoggingSections(
+    content: string,
+    payload: { alembicLevel: string; sqlalchemyLevel: string; logToFile: boolean; logFilePath: string }
+  ): string {
+    if (!content.trim().endsWith("\n")) {
+      content += "\n";
+    }
+
+    // Add [loggers] section
+    content += "\n[loggers]\n";
+    content += "keys = root,sqlalchemy,alembic\n\n";
+
+    // Add [handlers] section
+    content += "[handlers]\n";
+    if (payload.logToFile) {
+      content += "keys = console,file\n\n";
+    } else {
+      content += "keys = console\n\n";
+    }
+
+    // Add [formatters] section
+    content += "[formatters]\n";
+    content += "keys = generic\n\n";
+
+    // Add [logger_root] section
+    content += "[logger_root]\n";
+    content += "level = WARN\n";
+    content += "handlers = console\n";
+    content += "qualname =\n\n";
+
+    // Add [logger_sqlalchemy] section
+    content += "[logger_sqlalchemy]\n";
+    content += `level = ${payload.sqlalchemyLevel}\n`;
+    content += "handlers =\n";
+    content += "qualname = sqlalchemy.engine\n\n";
+
+    // Add [logger_alembic] section
+    content += "[logger_alembic]\n";
+    content += `level = ${payload.alembicLevel}\n`;
+    content += "handlers =\n";
+    content += "qualname = alembic\n\n";
+
+    // Add [handler_console] section
+    content += "[handler_console]\n";
+    content += "class = StreamHandler\n";
+    content += "args = (sys.stderr,)\n";
+    content += "level = NOTSET\n";
+    content += "formatter = generic\n\n";
+
+    // Add [handler_file] section if needed
+    if (payload.logToFile) {
+      content += "[handler_file]\n";
+      content += "class = FileHandler\n";
+      content += `args = ('${payload.logFilePath}', 'w')\n`;
+      content += "level = NOTSET\n";
+      content += "formatter = generic\n\n";
+
+      // Update root logger to use file handler
+      content = content.replace(
+        "[logger_root]\nlevel = WARN\nhandlers = console\n",
+        "[logger_root]\nlevel = WARN\nhandlers = console,file\n"
+      );
+    }
+
+    // Add [formatter_generic] section
+    content += "[formatter_generic]\n";
+    content += "format = %(levelname)-5.5s [%(name)s] %(message)s\n";
+    content += "datefmt = %H:%M:%S\n";
 
     return content;
   }
