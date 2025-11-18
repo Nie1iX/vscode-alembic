@@ -66,7 +66,7 @@
    8.5. Приёмка: `revision --autogenerate` учитывает фильтры; патч обратим.
    8.6. Оценка: M-L. Зависимости: 3.
 
-9. context.configure — compare_type, compare_server_default, render_as_batch, version_table(+_schema)
+9. ✅ context.configure — compare_type, compare_server_default, render_as_batch, version_table(+_schema) — **ВЫПОЛНЕНО**
    9.1. Описание: toggles для тонкой настройки автогенерации и имени таблицы версий.
    9.2. UI: чекбоксы + два текстовых поля.
    9.3. Код: патч `env.py` (добавление опций в `context.configure`).

@@ -295,6 +295,54 @@
     </div>
 
     <div class="section">
+      <div class="row"><strong>context.configure() Options</strong></div>
+      <div class="help" style="margin-bottom:10px;">Дополнительные опции для тонкой настройки автогенерации миграций.</div>
+
+      <div class="grid" style="grid-template-columns: 220px 1fr; gap: 10px; align-items: start;">
+        <label>Compare type</label>
+        <div>
+          <label class="inline" style="display:inline-flex; align-items:center; gap:8px;">
+            <input id="compareType" type="checkbox" /> enable type comparison
+          </label>
+          <div class="help">Сравнивать типы колонок при автогенерации (может генерировать много изменений).</div>
+        </div>
+
+        <label>Compare server default</label>
+        <div>
+          <label class="inline" style="display:inline-flex; align-items:center; gap:8px;">
+            <input id="compareServerDefault" type="checkbox" /> enable server default comparison
+          </label>
+          <div class="help">Сравнивать значения по умолчанию на сервере (server_default).</div>
+        </div>
+
+        <label>Render as batch</label>
+        <div>
+          <label class="inline" style="display:inline-flex; align-items:center; gap:8px;">
+            <input id="renderAsBatch" type="checkbox" /> enable batch mode
+          </label>
+          <div class="help">Использовать batch операции для SQLite и других БД без ALTER TABLE.</div>
+        </div>
+
+        <label>Version table name</label>
+        <div>
+          <input id="versionTable" type="text" placeholder="alembic_version (default)" />
+          <div class="help">Имя таблицы для хранения версий миграций. По умолчанию: alembic_version.</div>
+        </div>
+
+        <label>Version table schema</label>
+        <div>
+          <input id="versionTableSchema" type="text" placeholder="None (default)" />
+          <div class="help">Схема для таблицы версий. Оставьте пустым для None (по умолчанию).</div>
+        </div>
+      </div>
+
+      <div class="actions" style="margin-top:10px;">
+        <button onclick="applyContextOptions()">Apply Options to env.py</button>
+        <button onclick="previewContextOptions()" style="background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);">Preview Changes</button>
+      </div>
+    </div>
+
+    <div class="section">
       <div class="row"><strong>Raw alembic.ini</strong></div>
       <textarea id="raw" rows="24" spellcheck="false"></textarea>
       <div class="actions" style="margin-top:10px;"><button onclick="reloadIni()">Reload</button></div>
@@ -964,6 +1012,65 @@
       if (confirm('Are you sure you want to restore env.py from backup? This will undo all filter changes.')) {
         vscode.postMessage({ command: 'restoreEnvBackup' });
       }
+    }
+
+    // context.configure() options management
+    function loadContextOptions(config) {
+      if (config) {
+        if (config.compareType !== undefined) {
+          document.getElementById('compareType').checked = config.compareType;
+        }
+        if (config.compareServerDefault !== undefined) {
+          document.getElementById('compareServerDefault').checked = config.compareServerDefault;
+        }
+        if (config.renderAsBatch !== undefined) {
+          document.getElementById('renderAsBatch').checked = config.renderAsBatch;
+        }
+        if (config.versionTable) {
+          document.getElementById('versionTable').value = config.versionTable;
+        }
+        if (config.versionTableSchema) {
+          document.getElementById('versionTableSchema').value = config.versionTableSchema;
+        }
+      }
+    }
+
+    function applyContextOptions() {
+      const compareType = document.getElementById('compareType').checked;
+      const compareServerDefault = document.getElementById('compareServerDefault').checked;
+      const renderAsBatch = document.getElementById('renderAsBatch').checked;
+      const versionTable = document.getElementById('versionTable').value.trim();
+      const versionTableSchema = document.getElementById('versionTableSchema').value.trim();
+
+      vscode.postMessage({
+        command: 'applyContextOptions',
+        payload: {
+          compareType,
+          compareServerDefault,
+          renderAsBatch,
+          versionTable: versionTable || null,
+          versionTableSchema: versionTableSchema || null
+        }
+      });
+    }
+
+    function previewContextOptions() {
+      const compareType = document.getElementById('compareType').checked;
+      const compareServerDefault = document.getElementById('compareServerDefault').checked;
+      const renderAsBatch = document.getElementById('renderAsBatch').checked;
+      const versionTable = document.getElementById('versionTable').value.trim();
+      const versionTableSchema = document.getElementById('versionTableSchema').value.trim();
+
+      vscode.postMessage({
+        command: 'previewContextOptions',
+        payload: {
+          compareType,
+          compareServerDefault,
+          renderAsBatch,
+          versionTable: versionTable || null,
+          versionTableSchema: versionTableSchema || null
+        }
+      });
     }
 
     // Add event listeners for password masking

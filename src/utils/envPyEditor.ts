@@ -9,6 +9,11 @@ export interface EnvPyFilter {
 export interface EnvPyConfig {
   includeSchemas: boolean;
   filters: EnvPyFilter[];
+  compareType?: boolean;
+  compareServerDefault?: boolean;
+  renderAsBatch?: boolean;
+  versionTable?: string | null;
+  versionTableSchema?: string | null;
 }
 
 /**
@@ -111,11 +116,7 @@ ${filterChecks.join("\n")}
     const cleanedLines = this.removeGeneratedFunctions(lines);
 
     // Find context.configure() calls and patch them
-    const patchedLines = this.patchContextConfigure(
-      cleanedLines,
-      config.includeSchemas,
-      config.filters.length > 0,
-    );
+    const patchedLines = this.patchContextConfigure(cleanedLines, config);
 
     // Add include_object function if filters are defined
     let finalContent = patchedLines.join("\n");
@@ -192,16 +193,26 @@ ${filterChecks.join("\n")}
   }
 
   /**
-   * Patches context.configure() calls to add include_schemas and include_object
+   * Patches context.configure() calls to add all specified options
    */
   private static patchContextConfigure(
     lines: string[],
-    includeSchemas: boolean,
-    hasFilters: boolean,
+    config: EnvPyConfig,
   ): string[] {
     const result: string[] = [];
     let inContextConfigure = false;
     let configureIndent = 0;
+
+    // List of parameter names we manage
+    const managedParams = [
+      "include_schemas",
+      "include_object",
+      "compare_type",
+      "compare_server_default",
+      "render_as_batch",
+      "version_table",
+      "version_table_schema",
+    ];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -222,7 +233,7 @@ ${filterChecks.join("\n")}
           // Add our parameters before the closing paren
           const indent = " ".repeat(configureIndent + 4);
 
-          // Remove existing include_schemas and include_object if present
+          // Remove existing managed parameters
           const configLines = result.slice(
             result.findIndex((l) => /context\.configure\(/.test(l)) + 1,
           );
@@ -231,10 +242,10 @@ ${filterChecks.join("\n")}
             result.findIndex((l) => /context\.configure\(/.test(l)) + 1,
           );
           for (const cLine of configLines) {
-            if (
-              !cLine.includes("include_schemas=") &&
-              !cLine.includes("include_object=")
-            ) {
+            const shouldKeep = !managedParams.some((param) =>
+              cLine.includes(`${param}=`),
+            );
+            if (shouldKeep) {
               filteredResult.push(cLine);
             }
           }
@@ -242,11 +253,30 @@ ${filterChecks.join("\n")}
           result.push(...filteredResult);
 
           // Add new parameters
-          if (includeSchemas) {
+          if (config.includeSchemas) {
             result.push(`${indent}include_schemas=True,`);
           }
-          if (hasFilters) {
+          if (config.filters && config.filters.length > 0) {
             result.push(`${indent}include_object=include_object,`);
+          }
+          if (config.compareType) {
+            result.push(`${indent}compare_type=True,`);
+          }
+          if (config.compareServerDefault) {
+            result.push(`${indent}compare_server_default=True,`);
+          }
+          if (config.renderAsBatch) {
+            result.push(`${indent}render_as_batch=True,`);
+          }
+          if (config.versionTable) {
+            result.push(
+              `${indent}version_table=${JSON.stringify(config.versionTable)},`,
+            );
+          }
+          if (config.versionTableSchema) {
+            result.push(
+              `${indent}version_table_schema=${JSON.stringify(config.versionTableSchema)},`,
+            );
           }
 
           result.push(line);
@@ -254,11 +284,11 @@ ${filterChecks.join("\n")}
           continue;
         }
 
-        // Skip existing include_schemas and include_object lines
-        if (
-          line.includes("include_schemas=") ||
-          line.includes("include_object=")
-        ) {
+        // Skip existing managed parameters
+        const shouldSkip = managedParams.some((param) =>
+          line.includes(`${param}=`),
+        );
+        if (shouldSkip) {
           continue;
         }
       }
