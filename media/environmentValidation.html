@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Environment Validation</title>
+  <style>
+    body {
+      padding: 20px;
+      color: var(--vscode-foreground);
+      font-family: var(--vscode-font-family);
+      font-size: var(--vscode-font-size);
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      color: var(--vscode-foreground);
+    }
+
+    .summary {
+      display: flex;
+      gap: 24px;
+      margin: 20px 0;
+      padding: 16px;
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+    }
+
+    .summary-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .summary-value {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    .summary-label {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+      text-transform: uppercase;
+    }
+
+    .error-count {
+      color: var(--vscode-errorForeground);
+    }
+
+    .warning-count {
+      color: var(--vscode-editorWarning-foreground);
+    }
+
+    .info-count {
+      color: var(--vscode-charts-blue);
+    }
+
+    .status {
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+      font-weight: 500;
+      text-align: center;
+    }
+
+    .status.passed {
+      background: var(--vscode-testing-iconPassed);
+      color: var(--vscode-editor-background);
+    }
+
+    .status.failed {
+      background: var(--vscode-testing-iconFailed);
+      color: var(--vscode-editor-background);
+    }
+
+    .issues {
+      margin-top: 20px;
+    }
+
+    .issue {
+      padding: 12px;
+      margin-bottom: 8px;
+      background: var(--vscode-editor-background);
+      border-left: 3px solid;
+      border-radius: 2px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .issue.error {
+      border-left-color: var(--vscode-errorForeground);
+    }
+
+    .issue.warning {
+      border-left-color: var(--vscode-editorWarning-foreground);
+    }
+
+    .issue.info {
+      border-left-color: var(--vscode-charts-blue);
+    }
+
+    .issue-message {
+      flex: 1;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .issue-fix {
+      margin-left: 12px;
+    }
+
+    button {
+      padding: 6px 14px;
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    button:hover {
+      background: var(--vscode-button-hoverBackground);
+    }
+
+    button.secondary {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+    }
+
+    button.secondary:hover {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+
+    .actions {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid var(--vscode-descriptionForeground);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .empty {
+      text-align: center;
+      padding: 40px;
+      color: var(--vscode-descriptionForeground);
+    }
+  </style>
+</head>
+<body>
+  <h1>Environment Validation</h1>
+
+  <div class="actions">
+    <button onclick="refresh()">Refresh Validation</button>
+  </div>
+
+  <div id="loading" class="loading" style="display: none;">
+    <div class="spinner"></div>
+    <div style="margin-top: 12px;">Running validation...</div>
+  </div>
+
+  <div id="results" style="display: none;">
+    <div id="status" class="status"></div>
+
+    <div class="summary">
+      <div class="summary-item">
+        <div id="error-count" class="summary-value error-count">0</div>
+        <div class="summary-label">Errors</div>
+      </div>
+      <div class="summary-item">
+        <div id="warning-count" class="summary-value warning-count">0</div>
+        <div class="summary-label">Warnings</div>
+      </div>
+      <div class="summary-item">
+        <div id="info-count" class="summary-value info-count">0</div>
+        <div class="summary-label">Info</div>
+      </div>
+    </div>
+
+    <div class="issues" id="issues"></div>
+  </div>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+
+    function refresh() {
+      vscode.postMessage({ command: 'refresh' });
+    }
+
+    function runFix(index) {
+      vscode.postMessage({ command: 'runFix', index });
+    }
+
+    function displayResults(result) {
+      // Update summary
+      document.getElementById('error-count').textContent = result.summary.errors;
+      document.getElementById('warning-count').textContent = result.summary.warnings;
+      document.getElementById('info-count').textContent = result.summary.info;
+
+      // Update status
+      const statusEl = document.getElementById('status');
+      if (result.passed) {
+        statusEl.className = 'status passed';
+        statusEl.textContent = '✓ Environment validation passed';
+      } else {
+        statusEl.className = 'status failed';
+        statusEl.textContent = `✗ Environment validation failed (${result.summary.errors} error${result.summary.errors !== 1 ? 's' : ''})`;
+      }
+
+      // Display issues
+      const issuesEl = document.getElementById('issues');
+      issuesEl.innerHTML = '';
+
+      if (result.issues.length === 0) {
+        issuesEl.innerHTML = '<div class="empty">No issues found</div>';
+      } else {
+        result.issues.forEach((issue, index) => {
+          const issueDiv = document.createElement('div');
+          issueDiv.className = `issue ${issue.category}`;
+
+          const messageDiv = document.createElement('div');
+          messageDiv.className = 'issue-message';
+          messageDiv.textContent = issue.message;
+          issueDiv.appendChild(messageDiv);
+
+          if (issue.fix) {
+            const fixDiv = document.createElement('div');
+            fixDiv.className = 'issue-fix';
+            const fixButton = document.createElement('button');
+            fixButton.className = 'secondary';
+            fixButton.textContent = issue.fix.label;
+            fixButton.onclick = () => runFix(index);
+            fixDiv.appendChild(fixButton);
+            issueDiv.appendChild(fixDiv);
+          }
+
+          issuesEl.appendChild(issueDiv);
+        });
+      }
+
+      // Show results, hide loading
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('results').style.display = 'block';
+    }
+
+    // Handle messages from extension
+    window.addEventListener('message', event => {
+      const message = event.data;
+
+      switch (message.command) {
+        case 'validationStarted':
+          document.getElementById('loading').style.display = 'block';
+          document.getElementById('results').style.display = 'none';
+          break;
+
+        case 'validationComplete':
+          displayResults(message.result);
+          break;
+      }
+    });
+
+    // Signal that webview is ready
+    vscode.postMessage({ command: 'ready' });
+  </script>
+</body>
+</html>

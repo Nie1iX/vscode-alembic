@@ -8,6 +8,7 @@ import { PythonDetector } from "./utils/pythonDetector";
 import { AlembicIniEditorWebview } from "./webviews/settingsEditor";
 import { ModelInspector } from "./services/modelInspector";
 import { HistoryViewerWebview } from "./webviews/historyViewer";
+import { EnvironmentValidationWebview } from "./webviews/environmentValidation";
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("VS Code Alembic extension is now active!");
@@ -21,6 +22,10 @@ export function activate(context: vscode.ExtensionContext) {
   );
   const alembicIniEditor = new AlembicIniEditorWebview(context);
   const historyViewer = new HistoryViewerWebview(context, alembicService);
+  const environmentValidation = new EnvironmentValidationWebview(
+    context,
+    alembicService,
+  );
   const modelInspector = new ModelInspector();
   const modelsView = new ModelInspectorWebview(context);
   modelInspector.attachWebview(modelsView);
@@ -88,6 +93,9 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     vscode.commands.registerCommand("alembic.openMigrationFile", (migrationId: string) =>
       alembicService.openMigrationFile(migrationId),
+    ),
+    vscode.commands.registerCommand("alembic.validateEnvironment", () =>
+      environmentValidation.show(),
     ),
   ];
 

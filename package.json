@@ -134,6 +134,12 @@
         "title": "Inspect Alembic Model Visibility",
         "category": "Alembic",
         "icon": "$(list-unordered)"
+      },
+      {
+        "command": "alembic.validateEnvironment",
+        "title": "Validate Environment",
+        "category": "Alembic",
+        "icon": "$(checklist)"
       }
     ],
     "views": {
@@ -184,6 +190,11 @@
         },
         {
           "command": "alembic.inspectModels",
+          "when": "view == alembicMigrations",
+          "group": "navigation"
+        },
+        {
+          "command": "alembic.validateEnvironment",
           "when": "view == alembicMigrations",
           "group": "navigation"
         }
