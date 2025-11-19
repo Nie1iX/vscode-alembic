@@ -47,7 +47,10 @@
               <label style="width:auto; font-size:12px; color: var(--vscode-descriptionForeground);">Preview message:</label>
               <input id="previewMessage" type="text" placeholder="e.g., add user table" oninput="updateFilenamePreview()" style="width:100%; margin-top:4px;" />
             </div>
-            <div style="font-size:12px; color: var(--vscode-descriptionForeground);">Preview filename:</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+              <div style="font-size:12px; color: var(--vscode-descriptionForeground);">Preview filename:</div>
+              <div id="slugLengthCounter" style="font-size:11px; color: var(--vscode-descriptionForeground);"></div>
+            </div>
             <div id="filenamePreview" style="font-family:monospace; font-size:13px; color: var(--vscode-editor-foreground); margin-top:4px; padding:4px; background: var(--vscode-input-background); border-radius:2px;">
               [Enter message above to see preview]
             </div>
@@ -70,6 +73,12 @@
             Default: случайный хэш Alembic<br>
             Hybrid: 0001_1a2b3c4d (номер + хэш для читаемости и уникальности)
           </div>
+        </div>
+
+        <label>Slug length limit</label>
+        <div>
+          <input id="truncateSlugLength" type="number" min="10" max="200" placeholder="40 (default)" style="max-width:120px;" oninput="updateFilenamePreview()" />
+          <div class="help">Максимальная длина slug в имени файла (truncate_slug_length). По умолчанию: 40 символов.</div>
         </div>
 
         <label>sqlalchemy.url</label>
@@ -470,8 +479,8 @@
       const recursiveVersionLocations = document.getElementById('recursiveVersionLocations').checked;
       const revisionEnvironment = document.getElementById('revisionEnvironment').checked;
       const prependSysPath = getPrependSysPath();
-      const timezone = document.getElementById('timezone').value;
-      const truncateSlug = document.getElementById('truncateSlug').value;
+      const timezone = document.getElementById('timezone') ? document.getElementById('timezone').value : '';
+      const truncateSlugLength = document.getElementById('truncateSlugLength').value;
       const sourceless = document.getElementById('sourceless').checked;
       const outputEncoding = document.getElementById('outputEncoding').value;
       const sqlalchemyUrl = document.getElementById('sqlalchemyUrl').value;
@@ -490,7 +499,7 @@
           revisionEnvironment,
           prependSysPath,
           timezone,
-          truncateSlug,
+          truncateSlugLength,
           sourceless,
           outputEncoding,
           sqlalchemyUrl
@@ -1181,19 +1190,37 @@
       const template = document.getElementById('fileTemplate').value;
       const message = document.getElementById('previewMessage').value.trim();
       const previewDiv = document.getElementById('filenamePreview');
+      const counterDiv = document.getElementById('slugLengthCounter');
 
       if (!message) {
         previewDiv.textContent = '[Enter message above to see preview]';
         previewDiv.style.color = 'var(--vscode-descriptionForeground)';
+        counterDiv.textContent = '';
         return;
       }
 
+      // Get slug length limit (default 40)
+      const truncateSlugLengthInput = document.getElementById('truncateSlugLength');
+      const maxSlugLength = truncateSlugLengthInput.value ? parseInt(truncateSlugLengthInput.value) : 40;
+
       // Generate slug from message (simplified version)
-      const slug = message
+      let slug = message
         .toLowerCase()
         .replace(/[^a-z0-9\s]/g, '')
-        .replace(/\s+/g, '_')
-        .substring(0, 40);
+        .replace(/\s+/g, '_');
+
+      const fullSlugLength = slug.length;
+      slug = slug.substring(0, maxSlugLength);
+      const actualSlugLength = slug.length;
+
+      // Update counter
+      if (fullSlugLength > maxSlugLength) {
+        counterDiv.textContent = `Slug: ${actualSlugLength}/${maxSlugLength} (truncated from ${fullSlugLength})`;
+        counterDiv.style.color = 'var(--vscode-editorWarning-foreground)';
+      } else {
+        counterDiv.textContent = `Slug: ${actualSlugLength}/${maxSlugLength}`;
+        counterDiv.style.color = 'var(--vscode-descriptionForeground)';
+      }
 
       // Get current date/time for preview
       const now = new Date();

@@ -162,7 +162,7 @@ export class AlembicIniEditorWebview {
     revisionEnvironment?: boolean;
     prependSysPath?: string;
     timezone?: string;
-    truncateSlug?: string;
+    truncateSlugLength?: string;
     sourceless?: boolean;
     outputEncoding?: string;
     sqlalchemyUrl?: string;
@@ -185,7 +185,7 @@ export class AlembicIniEditorWebview {
         file_template: payload.template || "%(rev)s_%(slug)s",
       };
       if (payload.timezone !== undefined) { base["timezone"] = payload.timezone; }
-      if (payload.truncateSlug) { base["truncate_slug_length"] = payload.truncateSlug; }
+      if (payload.truncateSlugLength) { base["truncate_slug_length"] = payload.truncateSlugLength; }
       if (payload.sqlalchemyUrl !== undefined && payload.sqlalchemyUrl.trim() !== "") {
         base["sqlalchemy.url"] = payload.sqlalchemyUrl.trim();
       }
