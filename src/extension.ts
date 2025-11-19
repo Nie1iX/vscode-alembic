@@ -49,6 +49,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("alembic.downgrade", (migration?: any) =>
       alembicService.downgrade(migration?.id),
     ),
+    vscode.commands.registerCommand("alembic.stamp", (migration?: any) =>
+      alembicService.stamp(migration?.id),
+    ),
     vscode.commands.registerCommand("alembic.history", () =>
       alembicService.showHistory(),
     ),

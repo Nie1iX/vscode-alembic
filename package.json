@@ -71,6 +71,12 @@
         "icon": "$(arrow-down)"
       },
       {
+        "command": "alembic.stamp",
+        "title": "Stamp Database Version",
+        "category": "Alembic",
+        "icon": "$(tag)"
+      },
+      {
         "command": "alembic.history",
         "title": "Show Migration History",
         "category": "Alembic",
@@ -196,6 +202,11 @@
           "command": "alembic.downgrade",
           "when": "view == alembicMigrations && viewItem == migration",
           "group": "inline@3"
+        },
+        {
+          "command": "alembic.stamp",
+          "when": "view == alembicMigrations && viewItem == migration",
+          "group": "inline@4"
         }
       ],
       "commandPalette": [

@@ -198,6 +198,36 @@ export class AlembicService {
     }
   }
 
+  async stamp(revision?: string): Promise<void> {
+    let target = revision;
+
+    if (!target) {
+      target = await vscode.window.showInputBox({
+        prompt: "Enter target revision (e.g., head, <branch>@head, revision_id)",
+        placeHolder: "head",
+        validateInput: (value: string) => {
+          if (!value || value.trim().length === 0) {
+            return "Revision cannot be empty";
+          }
+          return null;
+        },
+      });
+    }
+
+    if (!target) {
+      return;
+    }
+
+    try {
+      const command = this.buildCommand(["stamp", target]);
+      await this.executeCommand(command);
+      vscode.window.showInformationMessage(`Database version stamped to ${target}`);
+      vscode.commands.executeCommand("alembic.refreshMigrations");
+    } catch (error) {
+      this.showError("Failed to stamp database version", error);
+    }
+  }
+
   async showHistory(): Promise<void> {
     try {
       const command = this.buildCommand(["history", "--verbose"]);
