@@ -939,6 +939,8 @@ export class AlembicIniEditorWebview {
     renderAsBatch: boolean;
     versionTable: string | null;
     versionTableSchema: string | null;
+    sqlalchemyModulePrefix: string | null;
+    userModulePrefix: string | null;
   }): Promise<void> {
     const { EnvPyEditor } = await import("../utils/envPyEditor");
     const cfg = ConfigurationManager.getConfiguration();
@@ -997,6 +999,8 @@ export class AlembicIniEditorWebview {
         renderAsBatch: payload.renderAsBatch,
         versionTable: payload.versionTable,
         versionTableSchema: payload.versionTableSchema,
+        sqlalchemyModulePrefix: payload.sqlalchemyModulePrefix,
+        userModulePrefix: payload.userModulePrefix,
       });
 
       vscode.window.showInformationMessage(
@@ -1018,6 +1022,8 @@ export class AlembicIniEditorWebview {
     renderAsBatch: boolean;
     versionTable: string | null;
     versionTableSchema: string | null;
+    sqlalchemyModulePrefix: string | null;
+    userModulePrefix: string | null;
   }): Promise<void> {
     const { EnvPyEditor } = await import("../utils/envPyEditor");
     const cfg = ConfigurationManager.getConfiguration();
@@ -1079,6 +1085,8 @@ export class AlembicIniEditorWebview {
         renderAsBatch: payload.renderAsBatch,
         versionTable: payload.versionTable,
         versionTableSchema: payload.versionTableSchema,
+        sqlalchemyModulePrefix: payload.sqlalchemyModulePrefix,
+        userModulePrefix: payload.userModulePrefix,
       });
 
       // Open diff view

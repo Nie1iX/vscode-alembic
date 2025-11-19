@@ -334,6 +334,18 @@
           <input id="versionTableSchema" type="text" placeholder="None (default)" />
           <div class="help">Схема для таблицы версий. Оставьте пустым для None (по умолчанию).</div>
         </div>
+
+        <label>SQLAlchemy module prefix</label>
+        <div>
+          <input id="sqlalchemyModulePrefix" type="text" placeholder="sa. (default)" />
+          <div class="help">Префикс для типов SQLAlchemy в генерируемых миграциях. По умолчанию: "sa."</div>
+        </div>
+
+        <label>User module prefix</label>
+        <div>
+          <input id="userModulePrefix" type="text" placeholder="None (default)" />
+          <div class="help">Префикс для пользовательских типов. Оставьте пустым для None.</div>
+        </div>
       </div>
 
       <div class="actions" style="margin-top:10px;">
@@ -1032,6 +1044,12 @@
         if (config.versionTableSchema) {
           document.getElementById('versionTableSchema').value = config.versionTableSchema;
         }
+        if (config.sqlalchemyModulePrefix) {
+          document.getElementById('sqlalchemyModulePrefix').value = config.sqlalchemyModulePrefix;
+        }
+        if (config.userModulePrefix) {
+          document.getElementById('userModulePrefix').value = config.userModulePrefix;
+        }
       }
     }
 
@@ -1041,6 +1059,8 @@
       const renderAsBatch = document.getElementById('renderAsBatch').checked;
       const versionTable = document.getElementById('versionTable').value.trim();
       const versionTableSchema = document.getElementById('versionTableSchema').value.trim();
+      const sqlalchemyModulePrefix = document.getElementById('sqlalchemyModulePrefix').value.trim();
+      const userModulePrefix = document.getElementById('userModulePrefix').value.trim();
 
       vscode.postMessage({
         command: 'applyContextOptions',
@@ -1049,7 +1069,9 @@
           compareServerDefault,
           renderAsBatch,
           versionTable: versionTable || null,
-          versionTableSchema: versionTableSchema || null
+          versionTableSchema: versionTableSchema || null,
+          sqlalchemyModulePrefix: sqlalchemyModulePrefix || null,
+          userModulePrefix: userModulePrefix || null
         }
       });
     }
@@ -1060,6 +1082,8 @@
       const renderAsBatch = document.getElementById('renderAsBatch').checked;
       const versionTable = document.getElementById('versionTable').value.trim();
       const versionTableSchema = document.getElementById('versionTableSchema').value.trim();
+      const sqlalchemyModulePrefix = document.getElementById('sqlalchemyModulePrefix').value.trim();
+      const userModulePrefix = document.getElementById('userModulePrefix').value.trim();
 
       vscode.postMessage({
         command: 'previewContextOptions',
@@ -1068,7 +1092,9 @@
           compareServerDefault,
           renderAsBatch,
           versionTable: versionTable || null,
-          versionTableSchema: versionTableSchema || null
+          versionTableSchema: versionTableSchema || null,
+          sqlalchemyModulePrefix: sqlalchemyModulePrefix || null,
+          userModulePrefix: userModulePrefix || null
         }
       });
     }

@@ -74,7 +74,7 @@
    9.5. Приёмка: опции применяются, автогенерация меняет поведение ожидаемо.
    9.6. Оценка: M. Зависимости: 8.
 
-10. context.configure — sqlalchemy_module_prefix / user_module_prefix
+10. ✅ context.configure — sqlalchemy_module_prefix / user_module_prefix — **ВЫПОЛНЕНО**
    10.1. Описание: управление префиксами для типов.
    10.2. UI: два поля строковых значений.
    10.3. Код: патч `env.py` с добавлением параметров.

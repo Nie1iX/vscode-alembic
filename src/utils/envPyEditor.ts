@@ -14,6 +14,8 @@ export interface EnvPyConfig {
   renderAsBatch?: boolean;
   versionTable?: string | null;
   versionTableSchema?: string | null;
+  sqlalchemyModulePrefix?: string | null;
+  userModulePrefix?: string | null;
 }
 
 /**
@@ -212,6 +214,8 @@ ${filterChecks.join("\n")}
       "render_as_batch",
       "version_table",
       "version_table_schema",
+      "sqlalchemy_module_prefix",
+      "user_module_prefix",
     ];
 
     for (let i = 0; i < lines.length; i++) {
@@ -276,6 +280,16 @@ ${filterChecks.join("\n")}
           if (config.versionTableSchema) {
             result.push(
               `${indent}version_table_schema=${JSON.stringify(config.versionTableSchema)},`,
+            );
+          }
+          if (config.sqlalchemyModulePrefix) {
+            result.push(
+              `${indent}sqlalchemy_module_prefix=${JSON.stringify(config.sqlalchemyModulePrefix)},`,
+            );
+          }
+          if (config.userModulePrefix) {
+            result.push(
+              `${indent}user_module_prefix=${JSON.stringify(config.userModulePrefix)},`,
             );
           }
 
