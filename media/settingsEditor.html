@@ -31,14 +31,27 @@
       <div class="grid">
         <label>File naming template</label>
         <div>
-          <select id="fileTemplate">
+          <select id="fileTemplate" onchange="updateFilenamePreview()">
             <option value="%(rev)s_%(slug)s">default: %(rev)s_%(slug)s</option>
-            <option value="%(year)d_%(month).2d_%(day).2d_%(hour).2d%(minute).2d-%(rev)s_%(slug)s">date_rev_slug</option>
+            <option value="%(year)d_%(month).2d_%(day).2d_%(hour).2d%(minute).2d-%(rev)s_%(slug)s">datetime_rev_slug</option>
             <option value="%(year)d_%(month).2d_%(day).2d_%(slug)s">date_slug</option>
             <option value="%(rev)s-%(slug)s">rev-slug-dash</option>
             <option value="%(rev)s">rev-only</option>
+            <option value="%(epoch)s_%(slug)s">epoch_slug (Unix timestamp)</option>
+            <option value="%(year)d%(month).2d%(day).2d_%(hour).2d%(minute).2d%(second).2d_%(slug)s">ISO8601-like_slug</option>
           </select>
           <div class="help">Задаёт шаблон имени файла (file_template). Не меняет сам revision id.</div>
+
+          <div style="margin-top:12px; padding:8px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-input-border); border-radius:3px;">
+            <div style="margin-bottom:6px;">
+              <label style="width:auto; font-size:12px; color: var(--vscode-descriptionForeground);">Preview message:</label>
+              <input id="previewMessage" type="text" placeholder="e.g., add user table" oninput="updateFilenamePreview()" style="width:100%; margin-top:4px;" />
+            </div>
+            <div style="font-size:12px; color: var(--vscode-descriptionForeground);">Preview filename:</div>
+            <div id="filenamePreview" style="font-family:monospace; font-size:13px; color: var(--vscode-editor-foreground); margin-top:4px; padding:4px; background: var(--vscode-input-background); border-radius:2px;">
+              [Enter message above to see preview]
+            </div>
+          </div>
         </div>
 
         <label>Revision ID strategy</label>
@@ -1161,6 +1174,56 @@
           targetBranch: targetBranch || null
         }
       });
+    }
+
+    // File template preview functionality
+    function updateFilenamePreview() {
+      const template = document.getElementById('fileTemplate').value;
+      const message = document.getElementById('previewMessage').value.trim();
+      const previewDiv = document.getElementById('filenamePreview');
+
+      if (!message) {
+        previewDiv.textContent = '[Enter message above to see preview]';
+        previewDiv.style.color = 'var(--vscode-descriptionForeground)';
+        return;
+      }
+
+      // Generate slug from message (simplified version)
+      const slug = message
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, '_')
+        .substring(0, 40);
+
+      // Get current date/time for preview
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hour = String(now.getHours()).padStart(2, '0');
+      const minute = String(now.getMinutes()).padStart(2, '0');
+      const second = String(now.getSeconds()).padStart(2, '0');
+      const epoch = Math.floor(now.getTime() / 1000);
+
+      // Sample revision id
+      const sampleRev = 'abc123def456';
+
+      // Replace template variables
+      let preview = template
+        .replace(/%(rev)s/g, sampleRev)
+        .replace(/%(slug)s/g, slug)
+        .replace(/%(year)d/g, year)
+        .replace(/%(month)\.2d/g, month)
+        .replace(/%(day)\.2d/g, day)
+        .replace(/%(hour)\.2d/g, hour)
+        .replace(/%(minute)\.2d/g, minute)
+        .replace(/%(second)\.2d/g, second)
+        .replace(/%(epoch)s/g, epoch);
+
+      preview += '.py';
+
+      previewDiv.textContent = preview;
+      previewDiv.style.color = 'var(--vscode-editor-foreground)';
     }
 
     // Add event listeners for password masking
