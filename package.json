@@ -78,9 +78,15 @@
       },
       {
         "command": "alembic.history",
-        "title": "Show Migration History",
+        "title": "Show Migration History (Output)",
         "category": "Alembic",
         "icon": "$(history)"
+      },
+      {
+        "command": "alembic.showHistoryViewer",
+        "title": "History & Branches Viewer",
+        "category": "Alembic",
+        "icon": "$(list-tree)"
       },
       {
         "command": "alembic.refreshMigrations",
@@ -153,6 +159,11 @@
         },
         {
           "command": "alembic.showMigrationGraph",
+          "when": "view == alembicMigrations",
+          "group": "navigation"
+        },
+        {
+          "command": "alembic.showHistoryViewer",
           "when": "view == alembicMigrations",
           "group": "navigation"
         },

@@ -243,6 +243,33 @@ export class AlembicService {
     }
   }
 
+  async getHistory(range?: string, verbose: boolean = true): Promise<string> {
+    const args = ["history"];
+    if (verbose) {
+      args.push("--verbose");
+    }
+    if (range) {
+      args.push("-r", range);
+    }
+    const command = this.buildCommand(args);
+    return await this.executeCommand(command);
+  }
+
+  async getHeads(): Promise<string> {
+    const command = this.buildCommand(["heads", "--verbose"]);
+    return await this.executeCommand(command);
+  }
+
+  async getBranches(): Promise<string> {
+    const command = this.buildCommand(["branches", "--verbose"]);
+    return await this.executeCommand(command);
+  }
+
+  async showRevision(id: string): Promise<string> {
+    const command = this.buildCommand(["show", id]);
+    return await this.executeCommand(command);
+  }
+
   async showVersion(): Promise<void> {
     try {
       const version = await this.getAlembicVersion();

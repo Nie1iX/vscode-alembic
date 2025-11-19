@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alembic History</title>
+  <style>
+    body {
+      padding: 16px;
+      color: var(--vscode-foreground);
+      font-family: var(--vscode-font-family);
+      font-size: var(--vscode-font-size);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+    }
+
+    .tab {
+      padding: 8px 16px;
+      background: transparent;
+      border: none;
+      color: var(--vscode-foreground);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      font-size: 14px;
+    }
+
+    .tab:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
+
+    .tab.active {
+      border-bottom-color: var(--vscode-focusBorder);
+      color: var(--vscode-focusBorder);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .filters {
+      margin-bottom: 16px;
+      padding: 12px;
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+    }
+
+    .filter-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .filter-row:last-child {
+      margin-bottom: 0;
+    }
+
+    label {
+      min-width: 80px;
+      font-size: 13px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 4px 8px;
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 2px;
+      font-family: var(--vscode-font-family);
+    }
+
+    input[type="checkbox"] {
+      margin-right: 4px;
+    }
+
+    button {
+      padding: 6px 14px;
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    button:hover {
+      background: var(--vscode-button-hoverBackground);
+    }
+
+    button.secondary {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+    }
+
+    button.secondary:hover {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+
+    .output {
+      font-family: var(--vscode-editor-font-family);
+      font-size: 13px;
+      background: var(--vscode-editor-background);
+      padding: 12px;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      white-space: pre-wrap;
+      max-height: 600px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+
+    .output:empty::before {
+      content: "Loading...";
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .revision-link {
+      color: var(--vscode-textLink-foreground);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .revision-link:hover {
+      color: var(--vscode-textLink-activeForeground);
+    }
+
+    .action-buttons {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+      margin-top: 4px;
+      font-style: italic;
+    }
+
+    .detail-view {
+      margin-top: 16px;
+      padding: 12px;
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+    }
+
+    .detail-view h3 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      color: var(--vscode-foreground);
+      font-size: 16px;
+    }
+
+    .detail-content {
+      font-family: var(--vscode-editor-font-family);
+      font-size: 13px;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="tabs">
+    <button class="tab active" data-tab="history">History</button>
+    <button class="tab" data-tab="heads">Heads</button>
+    <button class="tab" data-tab="branches">Branches</button>
+  </div>
+
+  <div id="history-tab" class="tab-content active">
+    <div class="filters">
+      <div class="filter-row">
+        <label>Range:</label>
+        <input type="text" id="range-input" placeholder="e.g., head:base, abc123:def456, -5">
+        <button onclick="loadHistory()">Load</button>
+      </div>
+      <div class="filter-row">
+        <label>
+          <input type="checkbox" id="verbose-checkbox" checked>
+          Verbose output
+        </label>
+        <div class="help-text">Range examples: head:base (all), abc:xyz (range), -10 (last 10)</div>
+      </div>
+    </div>
+
+    <div id="history-output" class="output"></div>
+
+    <div class="action-buttons">
+      <button class="secondary" onclick="copyOutput('history')">Copy Output</button>
+      <button class="secondary" onclick="copyCommand('history')">Copy Command</button>
+    </div>
+  </div>
+
+  <div id="heads-tab" class="tab-content">
+    <button onclick="loadHeads()" style="margin-bottom: 12px;">Refresh Heads</button>
+    <div id="heads-output" class="output"></div>
+
+    <div class="action-buttons">
+      <button class="secondary" onclick="copyOutput('heads')">Copy Output</button>
+    </div>
+  </div>
+
+  <div id="branches-tab" class="tab-content">
+    <button onclick="loadBranches()" style="margin-bottom: 12px;">Refresh Branches</button>
+    <div id="branches-output" class="output"></div>
+
+    <div class="action-buttons">
+      <button class="secondary" onclick="copyOutput('branches')">Copy Output</button>
+    </div>
+  </div>
+
+  <div id="revision-detail" class="detail-view" style="display: none;">
+    <h3>Revision Details</h3>
+    <div id="revision-detail-content" class="detail-content"></div>
+    <div class="action-buttons">
+      <button onclick="openRevisionFile()">Open File</button>
+      <button class="secondary" onclick="closeRevisionDetail()">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+    let currentRevisionId = null;
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.dataset.tab;
+
+        // Update tab states
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+        tab.classList.add('active');
+        document.getElementById(tabName + '-tab').classList.add('active');
+
+        // Load data for the selected tab
+        if (tabName === 'history') {
+          loadHistory();
+        } else if (tabName === 'heads') {
+          loadHeads();
+        } else if (tabName === 'branches') {
+          loadBranches();
+        }
+      });
+    });
+
+    function loadHistory() {
+      const range = document.getElementById('range-input').value.trim() || undefined;
+      const verbose = document.getElementById('verbose-checkbox').checked;
+      vscode.postMessage({ command: 'loadHistory', range, verbose });
+    }
+
+    function loadHeads() {
+      vscode.postMessage({ command: 'loadHeads' });
+    }
+
+    function loadBranches() {
+      vscode.postMessage({ command: 'loadBranches' });
+    }
+
+    function showRevision(id) {
+      currentRevisionId = id;
+      vscode.postMessage({ command: 'showRevision', id });
+      document.getElementById('revision-detail').style.display = 'block';
+    }
+
+    function openRevisionFile() {
+      if (currentRevisionId) {
+        vscode.postMessage({ command: 'openFile', id: currentRevisionId });
+      }
+    }
+
+    function closeRevisionDetail() {
+      document.getElementById('revision-detail').style.display = 'none';
+      currentRevisionId = null;
+    }
+
+    function makeRevisionsClickable(text) {
+      // Match revision IDs (hexadecimal strings)
+      return text.replace(/\b([a-f0-9]{7,})\b/gi, (match) => {
+        return `<span class="revision-link" onclick="showRevision('${match}')">${match}</span>`;
+      });
+    }
+
+    function copyOutput(tabName) {
+      const output = document.getElementById(tabName + '-output').textContent;
+      navigator.clipboard.writeText(output);
+      vscode.postMessage({ command: 'copyCommand', text: output });
+    }
+
+    function copyCommand(tabName) {
+      let cmd = 'alembic ';
+      if (tabName === 'history') {
+        const range = document.getElementById('range-input').value.trim();
+        const verbose = document.getElementById('verbose-checkbox').checked;
+        cmd += 'history';
+        if (verbose) cmd += ' --verbose';
+        if (range) cmd += ` -r ${range}`;
+      } else {
+        cmd += tabName + ' --verbose';
+      }
+      vscode.postMessage({ command: 'copyCommand', text: cmd });
+    }
+
+    // Handle messages from extension
+    window.addEventListener('message', event => {
+      const message = event.data;
+
+      switch (message.command) {
+        case 'updateHistory':
+          document.getElementById('history-output').innerHTML = makeRevisionsClickable(message.data);
+          break;
+
+        case 'updateHeads':
+          document.getElementById('heads-output').innerHTML = makeRevisionsClickable(message.data);
+          break;
+
+        case 'updateBranches':
+          document.getElementById('branches-output').innerHTML = makeRevisionsClickable(message.data);
+          break;
+
+        case 'updateRevisionDetail':
+          document.getElementById('revision-detail-content').innerHTML = makeRevisionsClickable(message.data);
+          break;
+      }
+    });
+
+    // Signal that webview is ready
+    vscode.postMessage({ command: 'ready' });
+  </script>
+</body>
+</html>
