@@ -69,6 +69,12 @@ export class AlembicIniEditorWebview {
         case "previewContextOptions":
           await this.previewContextOptions(message.payload);
           break;
+        case "applyRevisionDirectives":
+          await this.applyRevisionDirectives(message.payload);
+          break;
+        case "previewRevisionDirectives":
+          await this.previewRevisionDirectives(message.payload);
+          break;
         case "showError":
           vscode.window.showErrorMessage(
             message.payload?.message || "An error occurred",
@@ -1108,6 +1114,168 @@ export class AlembicIniEditorWebview {
     } catch (e) {
       vscode.window.showErrorMessage(
         `Failed to preview context.configure options: ${e}`,
+      );
+    }
+  }
+
+  /**
+   * Applies process_revision_directives configuration to env.py
+   */
+  private async applyRevisionDirectives(payload: {
+    skipEmptyRevisions: boolean;
+    targetBranch: string | null;
+  }): Promise<void> {
+    const { EnvPyEditor } = await import("../utils/envPyEditor");
+    const cfg = ConfigurationManager.getConfiguration();
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+      return;
+    }
+
+    // Find env.py in script_location
+    const iniUri = vscode.Uri.joinPath(folders[0].uri, cfg.configFile);
+    let scriptLocation = "alembic";
+
+    try {
+      const raw = (await vscode.workspace.fs.readFile(iniUri)).toString();
+      const match = raw.match(/^[ \t]*script_location\s*=\s*(.+)$/m);
+      if (match) {
+        scriptLocation = match[1].trim();
+      }
+    } catch (e) {
+      // Use default
+    }
+
+    const envPyUri = vscode.Uri.joinPath(
+      folders[0].uri,
+      scriptLocation,
+      "env.py",
+    );
+
+    try {
+      // Validate env.py exists
+      const isValid = await EnvPyEditor.validateEnvPy(envPyUri);
+      if (!isValid) {
+        vscode.window.showErrorMessage(
+          `env.py not found or invalid at ${scriptLocation}/env.py`,
+        );
+        return;
+      }
+
+      // Create backup
+      await EnvPyEditor.createBackup(envPyUri);
+
+      // Apply patches - preserve existing settings
+      const currentContent = (
+        await vscode.workspace.fs.readFile(envPyUri)
+      ).toString();
+
+      // Parse current config to preserve existing settings
+      const hasIncludeSchemas = currentContent.includes("include_schemas=True");
+      const hasIncludeObject = currentContent.includes("include_object=");
+
+      await EnvPyEditor.patchEnvPy(envPyUri, {
+        includeSchemas: hasIncludeSchemas,
+        filters: hasIncludeObject ? [] : [],
+        skipEmptyRevisions: payload.skipEmptyRevisions,
+        targetBranch: payload.targetBranch,
+      });
+
+      vscode.window.showInformationMessage(
+        "process_revision_directives applied. Backup created at env.py.backup",
+      );
+    } catch (e) {
+      vscode.window.showErrorMessage(
+        `Failed to apply process_revision_directives: ${e}`,
+      );
+    }
+  }
+
+  /**
+   * Previews process_revision_directives changes
+   */
+  private async previewRevisionDirectives(payload: {
+    skipEmptyRevisions: boolean;
+    targetBranch: string | null;
+  }): Promise<void> {
+    const { EnvPyEditor } = await import("../utils/envPyEditor");
+    const cfg = ConfigurationManager.getConfiguration();
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+      return;
+    }
+
+    // Find env.py in script_location
+    const iniUri = vscode.Uri.joinPath(folders[0].uri, cfg.configFile);
+    let scriptLocation = "alembic";
+
+    try {
+      const raw = (await vscode.workspace.fs.readFile(iniUri)).toString();
+      const match = raw.match(/^[ \t]*script_location\s*=\s*(.+)$/m);
+      if (match) {
+        scriptLocation = match[1].trim();
+      }
+    } catch (e) {
+      // Use default
+    }
+
+    const envPyUri = vscode.Uri.joinPath(
+      folders[0].uri,
+      scriptLocation,
+      "env.py",
+    );
+
+    try {
+      // Validate env.py exists
+      const isValid = await EnvPyEditor.validateEnvPy(envPyUri);
+      if (!isValid) {
+        vscode.window.showErrorMessage(
+          `env.py not found or invalid at ${scriptLocation}/env.py`,
+        );
+        return;
+      }
+
+      // Create a temporary preview file
+      const originalContent = (
+        await vscode.workspace.fs.readFile(envPyUri)
+      ).toString();
+      const tempUri = vscode.Uri.file(envPyUri.fsPath + ".preview");
+      await vscode.workspace.fs.writeFile(
+        tempUri,
+        Buffer.from(originalContent, "utf8"),
+      );
+
+      // Parse current config to preserve existing settings
+      const hasIncludeSchemas = originalContent.includes("include_schemas=True");
+      const hasIncludeObject = originalContent.includes("include_object=");
+
+      // Apply patches to preview
+      await EnvPyEditor.patchEnvPy(tempUri, {
+        includeSchemas: hasIncludeSchemas,
+        filters: hasIncludeObject ? [] : [],
+        skipEmptyRevisions: payload.skipEmptyRevisions,
+        targetBranch: payload.targetBranch,
+      });
+
+      // Open diff view
+      await vscode.commands.executeCommand(
+        "vscode.diff",
+        envPyUri,
+        tempUri,
+        "process_revision_directives Preview (Original ↔ New)",
+      );
+
+      // Clean up temp file after a delay
+      setTimeout(async () => {
+        try {
+          await vscode.workspace.fs.delete(tempUri);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }, 30000); // Delete after 30 seconds
+    } catch (e) {
+      vscode.window.showErrorMessage(
+        `Failed to preview process_revision_directives: ${e}`,
       );
     }
   }

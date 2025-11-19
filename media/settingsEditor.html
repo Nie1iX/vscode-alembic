@@ -355,6 +355,32 @@
     </div>
 
     <div class="section">
+      <div class="row"><strong>process_revision_directives Hooks</strong></div>
+      <div class="help" style="margin-bottom:10px;">Настройка хуков для обработки ревизий перед их созданием.</div>
+
+      <div class="grid" style="grid-template-columns: 220px 1fr; gap: 10px; align-items: start;">
+        <label>Skip empty revisions</label>
+        <div>
+          <label class="inline" style="display:inline-flex; align-items:center; gap:8px;">
+            <input id="skipEmptyRevisions" type="checkbox" /> не создавать пустые ревизии
+          </label>
+          <div class="help">Если autogenerate не обнаружит изменений, файл ревизии не будет создан.</div>
+        </div>
+
+        <label>Target branch/head</label>
+        <div>
+          <input id="targetBranch" type="text" placeholder="e.g., @head, branch_name (optional)" />
+          <div class="help">Направить новые ревизии в определённый branch или head. Оставьте пустым для автоматического выбора.</div>
+        </div>
+      </div>
+
+      <div class="actions" style="margin-top:10px;">
+        <button onclick="applyRevisionDirectives()">Apply Revision Directives to env.py</button>
+        <button onclick="previewRevisionDirectives()" style="background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);">Preview Changes</button>
+      </div>
+    </div>
+
+    <div class="section">
       <div class="row"><strong>Raw alembic.ini</strong></div>
       <textarea id="raw" rows="24" spellcheck="false"></textarea>
       <div class="actions" style="margin-top:10px;"><button onclick="reloadIni()">Reload</button></div>
@@ -1095,6 +1121,44 @@
           versionTableSchema: versionTableSchema || null,
           sqlalchemyModulePrefix: sqlalchemyModulePrefix || null,
           userModulePrefix: userModulePrefix || null
+        }
+      });
+    }
+
+    // process_revision_directives management
+    function loadRevisionDirectives(config) {
+      if (config) {
+        if (config.skipEmptyRevisions !== undefined) {
+          document.getElementById('skipEmptyRevisions').checked = config.skipEmptyRevisions;
+        }
+        if (config.targetBranch) {
+          document.getElementById('targetBranch').value = config.targetBranch;
+        }
+      }
+    }
+
+    function applyRevisionDirectives() {
+      const skipEmptyRevisions = document.getElementById('skipEmptyRevisions').checked;
+      const targetBranch = document.getElementById('targetBranch').value.trim();
+
+      vscode.postMessage({
+        command: 'applyRevisionDirectives',
+        payload: {
+          skipEmptyRevisions,
+          targetBranch: targetBranch || null
+        }
+      });
+    }
+
+    function previewRevisionDirectives() {
+      const skipEmptyRevisions = document.getElementById('skipEmptyRevisions').checked;
+      const targetBranch = document.getElementById('targetBranch').value.trim();
+
+      vscode.postMessage({
+        command: 'previewRevisionDirectives',
+        payload: {
+          skipEmptyRevisions,
+          targetBranch: targetBranch || null
         }
       });
     }
