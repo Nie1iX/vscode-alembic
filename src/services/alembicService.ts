@@ -98,7 +98,17 @@ export class AlembicService {
       );
       vscode.commands.executeCommand("alembic.refreshMigrations");
     } catch (error) {
-      this.showError("Failed to create migration", error);
+      if (this.isTargetDatabaseOutOfDate(error)) {
+        const action = await vscode.window.showWarningMessage(
+          "Alembic cannot create an autogenerate migration because the database is not upgraded to the current head.",
+          "Upgrade to Head",
+        );
+        if (action === "Upgrade to Head") {
+          await this.upgrade("head");
+        }
+      } else {
+        this.showError("Failed to create migration", error);
+      }
     }
   }
 
@@ -236,19 +246,26 @@ export class AlembicService {
     // Parse migrations from history (without current info)
     const migrations = this.parseMigrations(historyResult, "");
 
-    // Start getting current migration in background - don't wait for it
-    this.updateCurrentMigrationAsync(migrations);
+    await this.updateCurrentMigration(migrations);
 
     return migrations;
   }
 
-  private async updateCurrentMigrationAsync(migrations: Migration[]): Promise<void> {
+  private async updateCurrentMigration(migrations: Migration[]): Promise<void> {
     try {
       const currentResult = await this.executeCommand(
         this.buildCommand(["current"]),
       );
 
-      const currentMigration = currentResult.trim();
+      const currentMigration = this.extractCurrentRevision(currentResult);
+
+      if (!currentMigration) {
+        for (const m of migrations) {
+          m.isApplied = false;
+          m.isCurrent = false;
+        }
+        return;
+      }
 
       // Update current migration info
       for (const m of migrations) {
@@ -272,9 +289,6 @@ export class AlembicService {
           m.isApplied = applied.has(m.id);
         }
       }
-
-      // Refresh the tree view to show updated current migration
-      vscode.commands.executeCommand("alembic.refreshMigrations");
 
     } catch (error) {
       // If current command fails, just log it - migrations are already shown
@@ -375,30 +389,57 @@ export class AlembicService {
     currentOutput: string,
   ): Migration[] {
     const migrations: Migration[] = [];
-    const currentMigration = currentOutput.trim();
+    const currentMigration = this.extractCurrentRevision(currentOutput);
     const lines = historyOutput.split("\n");
     const config = ConfigurationManager.getConfiguration();
 
     for (const line of lines) {
-      const match = line.match(
-        /^([a-f0-9]+)\s+\->\s+([a-f0-9]+)?\s*,?\s*(.*)$/,
+      const match = line.trim().match(
+        /^(.+?)\s+->\s+([^\s,]+)(?:\s+\([^)]+\))?,?\s*(.*)$/,
       );
       if (match) {
         const [, downRev, id, message] = match;
         if (id) {
+          const normalizedDownRevision = this.normalizeDownRevision(downRev);
+
           migrations.push({
             id: id,
             shortId: config.showFullHash ? id : AlembicUtils.getShortHash(id),
             message: AlembicUtils.formatMessage(message.trim()),
             isCurrent: id === currentMigration,
-            isApplied: true, // We'll determine this more accurately later
-            downRevision: downRev !== "None" ? downRev : undefined,
+            isApplied: false,
+            downRevision: normalizedDownRevision,
           });
         }
       }
     }
 
     return migrations;
+  }
+
+  private extractCurrentRevision(output: string): string {
+    const trimmed = output.trim();
+    const match = trimmed.match(/^([^\s(]+)/);
+    return match?.[1] || "";
+  }
+
+  private normalizeDownRevision(downRevision: string): string | undefined {
+    const normalized = downRevision.trim();
+    if (
+      !normalized ||
+      normalized === "<base>" ||
+      normalized.toLowerCase() === "base" ||
+      normalized.toLowerCase() === "none"
+    ) {
+      return undefined;
+    }
+
+    return normalized.split(",")[0].trim();
+  }
+
+  private isTargetDatabaseOutOfDate(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.includes("Target database is not up to date");
   }
 
   private async getAvailableTemplates(): Promise<
@@ -609,11 +650,12 @@ export class AlembicService {
 
       const process = spawn(cmd, args, {
         cwd: workspaceFolder,
-        shell: true,
+        shell: false,
       });
 
       let stdout = "";
       let stderr = "";
+      let settled = false;
 
       process.stdout.on("data", (data: Buffer) => {
         const output = data.toString();
@@ -627,7 +669,19 @@ export class AlembicService {
         this.outputChannel.append(output);
       });
 
+      process.on("error", (error: Error) => {
+        settled = true;
+        const errorMsg = `Failed to execute ${cmd}: ${error.message}`;
+        vscode.window.showErrorMessage(`Alembic error: ${errorMsg}`);
+        reject(new Error(errorMsg));
+      });
+
       process.on("close", (code: number) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+
         if (code === 0) {
           resolve(stdout);
         } else {

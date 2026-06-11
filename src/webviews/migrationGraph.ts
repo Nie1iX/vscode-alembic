@@ -29,28 +29,39 @@ export class MigrationGraphWebview {
 
     // Handle messages from webview
     this.panel.webview.onDidReceiveMessage(async (message) => {
-      switch (message.command) {
-        case "ready":
-          await this.updateGraph();
-          break;
-        case "refresh":
-          await this.updateGraph();
-          break;
-        case "upgrade":
-          await this.alembicService.upgrade(message.id);
-          await this.updateGraph();
-          break;
-        case "downgrade":
-          await this.alembicService.downgrade(message.id);
-          await this.updateGraph();
-          break;
-        case "merge":
-          await this.alembicService.mergeBranches(message.id);
-          await this.updateGraph();
-          break;
-        case "openFile":
-          await this.alembicService.openMigrationFile(message.id);
-          break;
+      try {
+        switch (message.command) {
+          case "ready":
+            await this.updateGraph();
+            break;
+          case "refresh":
+            await this.updateGraph();
+            break;
+          case "upgradeHead":
+            await this.alembicService.upgrade("head");
+            await this.updateGraph();
+            break;
+          case "upgrade":
+            await this.alembicService.upgrade(message.id);
+            await this.updateGraph();
+            break;
+          case "downgrade":
+            await this.alembicService.downgrade(message.id);
+            await this.updateGraph();
+            break;
+          case "merge":
+            await this.alembicService.mergeBranches(message.id);
+            await this.updateGraph();
+            break;
+          case "openFile":
+            await this.alembicService.openMigrationFile(message.id);
+            break;
+        }
+      } catch (error) {
+        this.panel?.webview.postMessage({
+          command: "error",
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
       }
     });
 

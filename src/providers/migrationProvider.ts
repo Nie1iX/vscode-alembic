@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import * as path from "path";
 import { Migration } from "../models/migration";
 import { AlembicService } from "../services/alembicService";
 
@@ -39,7 +38,7 @@ export class AlembicMigrationProvider
           ];
         }
 
-        const items: MigrationItem[] = [];
+        const categories: MigrationItem[] = [];
 
         // Group migrations by status
         const applied = migrations.filter((m) => m.isApplied && !m.isCurrent);
@@ -47,48 +46,39 @@ export class AlembicMigrationProvider
         const pending = migrations.filter((m) => !m.isApplied);
 
         if (current.length > 0) {
-          items.push(
-            new MigrationItem(
+          categories.push(
+            this.createCategoryItem(
               "Current",
-              "",
+              "current",
+              current.map((m) => this.createMigrationItem(m, "current")),
               vscode.TreeItemCollapsibleState.Expanded,
-              "category",
             ),
-          );
-          items.push(
-            ...current.map((m) => this.createMigrationItem(m, "current")),
           );
         }
 
         if (applied.length > 0) {
-          items.push(
-            new MigrationItem(
+          categories.push(
+            this.createCategoryItem(
               "Applied",
-              "",
+              "applied",
+              applied.map((m) => this.createMigrationItem(m, "applied")),
               vscode.TreeItemCollapsibleState.Collapsed,
-              "category",
             ),
-          );
-          items.push(
-            ...applied.map((m) => this.createMigrationItem(m, "applied")),
           );
         }
 
         if (pending.length > 0) {
-          items.push(
-            new MigrationItem(
+          categories.push(
+            this.createCategoryItem(
               "Pending",
-              "",
+              "pending",
+              pending.map((m) => this.createMigrationItem(m, "pending")),
               vscode.TreeItemCollapsibleState.Collapsed,
-              "category",
             ),
-          );
-          items.push(
-            ...pending.map((m) => this.createMigrationItem(m, "pending")),
           );
         }
 
-        return items;
+        return categories;
       } catch (error) {
         vscode.window.showErrorMessage(
           `Failed to load migrations: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -104,7 +94,24 @@ export class AlembicMigrationProvider
       }
     }
 
-    return [];
+    return element.children ?? [];
+  }
+
+  private createCategoryItem(
+    label: string,
+    id: string,
+    children: MigrationItem[],
+    collapsibleState: vscode.TreeItemCollapsibleState,
+  ): MigrationItem {
+    const item = new MigrationItem(
+      `${label} (${children.length})`,
+      `category:${id}`,
+      collapsibleState,
+      "category",
+      children,
+    );
+    item.iconPath = new vscode.ThemeIcon("folder");
+    return item;
   }
 
   private createMigrationItem(
@@ -157,6 +164,7 @@ class MigrationItem extends vscode.TreeItem {
     public readonly id: string,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
     public readonly contextValue: string,
+    public readonly children?: MigrationItem[],
   ) {
     super(label, collapsibleState);
     this.id = id;

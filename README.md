@@ -128,6 +128,11 @@ The migration graph provides a visual representation of your migration dependenc
 
 ## Development
 
+### Testing Guides
+
+- [English testing guide](START_TESTING_EN.md)
+- [Russian testing guide](START_TESTING.md)
+
 ### Building from Source
 
 ```bash

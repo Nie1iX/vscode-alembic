@@ -83,11 +83,12 @@
 </head>
 <body>
   <div class="toolbar">
-    <button onclick="refreshGraph()">Refresh</button>
-    <button onclick="fitNetwork()">Fit to Screen</button>
-    <button onclick="upgradeSelected()">Upgrade to selected</button>
-    <button onclick="downgradeSelected()">Downgrade to selected</button>
-    <button onclick="mergeSelected()">Merge from selected</button>
+    <button id="refreshButton" type="button">Refresh</button>
+    <button id="fitButton" type="button">Fit to Screen</button>
+    <button id="upgradeHeadButton" type="button">Upgrade to Head</button>
+    <button id="upgradeButton" type="button" disabled>Upgrade to selected</button>
+    <button id="downgradeButton" type="button" disabled>Downgrade to selected</button>
+    <button id="mergeButton" type="button" disabled>Merge from selected</button>
     <span id="status">Loading...</span>
   </div>
 
@@ -111,6 +112,7 @@
   <script nonce="__NONCE__">
     const vscode = acquireVsCodeApi();
     let network = null;
+    let currentNode = null;
 
     // Network options
     const options = {
@@ -161,8 +163,13 @@
 
       // Handle node selection & actions
       network.on('selectNode', function(params) {
-        const nodeId = params.nodes[0];
-        window.currentNode = nodeId;
+        currentNode = params.nodes[0] || null;
+        updateActionButtons();
+      });
+
+      network.on('deselectNode', function() {
+        currentNode = null;
+        updateActionButtons();
       });
     }
 
@@ -172,8 +179,10 @@
       }
 
       if (!graphData || (!graphData.nodes.length && !graphData.edges.length)) {
-        document.getElementById('graph').innerHTML = '<div class="no-data">No migration data available</div>';
         document.getElementById('status').textContent = 'No data';
+        network.setData({ nodes: [], edges: [] });
+        currentNode = null;
+        updateActionButtons();
         return;
       }
 
@@ -188,25 +197,44 @@
       }, 100);
 
       document.getElementById('status').textContent = `${graphData.nodes.length} migrations`;
+      currentNode = null;
+      updateActionButtons();
     }
 
     function refreshGraph() {
       document.getElementById('status').textContent = 'Refreshing...';
       vscode.postMessage({ command: 'refresh' });
     }
+
+    function upgradeHead() {
+      document.getElementById('status').textContent = 'Upgrading to head...';
+      vscode.postMessage({ command: 'upgradeHead' });
+    }
+
     function upgradeSelected() {
-      if (window.currentNode) {
-        vscode.postMessage({ command: 'upgrade', id: window.currentNode });
+      if (currentNode) {
+        document.getElementById('status').textContent = `Upgrading to ${currentNode}...`;
+        vscode.postMessage({ command: 'upgrade', id: currentNode });
+      } else {
+        document.getElementById('status').textContent = 'Select a migration first';
       }
     }
+
     function downgradeSelected() {
-      if (window.currentNode) {
-        vscode.postMessage({ command: 'downgrade', id: window.currentNode });
+      if (currentNode) {
+        document.getElementById('status').textContent = `Downgrading to ${currentNode}...`;
+        vscode.postMessage({ command: 'downgrade', id: currentNode });
+      } else {
+        document.getElementById('status').textContent = 'Select a migration first';
       }
     }
+
     function mergeSelected() {
-      if (window.currentNode) {
-        vscode.postMessage({ command: 'merge', id: window.currentNode });
+      if (currentNode) {
+        document.getElementById('status').textContent = `Merging from ${currentNode}...`;
+        vscode.postMessage({ command: 'merge', id: currentNode });
+      } else {
+        document.getElementById('status').textContent = 'Select a migration first';
       }
     }
 
@@ -216,6 +244,23 @@
       }
     }
 
+    function updateActionButtons() {
+      const hasSelection = Boolean(currentNode);
+      document.getElementById('upgradeButton').disabled = !hasSelection;
+      document.getElementById('downgradeButton').disabled = !hasSelection;
+      document.getElementById('mergeButton').disabled = !hasSelection;
+    }
+
+    function bindToolbar() {
+      document.getElementById('refreshButton').addEventListener('click', refreshGraph);
+      document.getElementById('fitButton').addEventListener('click', fitNetwork);
+      document.getElementById('upgradeHeadButton').addEventListener('click', upgradeHead);
+      document.getElementById('upgradeButton').addEventListener('click', upgradeSelected);
+      document.getElementById('downgradeButton').addEventListener('click', downgradeSelected);
+      document.getElementById('mergeButton').addEventListener('click', mergeSelected);
+      updateActionButtons();
+    }
+
     // Handle messages from extension
     window.addEventListener('message', event => {
       const message = event.data;
@@ -223,10 +268,14 @@
         case 'updateGraph':
           updateGraph(message.data);
           break;
+        case 'error':
+          document.getElementById('status').textContent = message.message || 'Command failed';
+          break;
       }
     });
 
     // Initialize
+    bindToolbar();
     initNetwork();
     vscode.postMessage({ command: 'ready' });
   </script>

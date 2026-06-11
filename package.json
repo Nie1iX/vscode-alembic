@@ -12,6 +12,7 @@
   "activationEvents": [
     "onCommand:alembic.init",
     "onCommand:alembic.showMigrationGraph",
+    "onCommand:alembic.upgradeHead",
     "workspaceContains:**/alembic.ini"
   ],
   "main": "./dist/extension.js",
@@ -63,6 +64,12 @@
         "title": "Upgrade Database",
         "category": "Alembic",
         "icon": "$(arrow-up)"
+      },
+      {
+        "command": "alembic.upgradeHead",
+        "title": "Upgrade to Head",
+        "category": "Alembic",
+        "icon": "$(cloud-upload)"
       },
       {
         "command": "alembic.downgrade",
@@ -142,6 +149,11 @@
         },
         {
           "command": "alembic.createMigration",
+          "when": "view == alembicMigrations",
+          "group": "navigation"
+        },
+        {
+          "command": "alembic.upgradeHead",
           "when": "view == alembicMigrations",
           "group": "navigation"
         },
